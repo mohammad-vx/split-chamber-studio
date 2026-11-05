@@ -1,0 +1,107 @@
+{
+  "seed": 1234,
+  "startedAt": "2026-11-05T18:08:12.933Z",
+  "engines": {
+    "mb-hw": {
+      "ok": true,
+      "wallSeconds": 43.44,
+      "renderSeconds": 43.44,
+      "label": "MediaBunny · WebCodecs (hardware)",
+      "encoderConfig": {
+        "codec": "avc1.640029",
+        "hardwareAcceleration": "prefer-hardware",
+        "bitrate": 32000000
+      },
+      "verify": {
+        "width": 1080,
+        "height": 1920,
+        "fps": "60/1",
+        "frames": 1521,
+        "duration": 25.35,
+        "videoCodec": "h264 High",
+        "pixFmt": "yuv420p",
+        "color": "bt709/tv",
+        "audio": "aac 48000 Hz 2ch 25.366s",
+        "sizeMB": 89.1,
+        "bitrateMbps": 28.1
+      },
+      "path": "D:/python proj/split-chamber/baseline/v1/render\\bench_mb-hw.mp4"
+    }
+  },
+  "sim": {
+    "frames": 1521,
+    "capFrame": 1041,
+    "simMs": 4795,
+    "hashA": "4e0d9fbb",
+    "hashB": "4e0d9fbb",
+    "deterministic": true,
+    "fileRoundTrip": true
+  },
+  "render": {
+    "sections_webgl2_0.510": {
+      "bg": 0,
+      "balls": 0.51,
+      "rings": 0.09,
+      "impacts": 0.02,
+      "gold": 0.01,
+      "pistons": 0.06,
+      "overlay": 0.01,
+      "counter": 0.17,
+      "outro": 0.04
+    },
+    "flush_webgl2_0.510": 919.9,
+    "frame_webgl2_0.510": {
+      "p50": 0.5,
+      "p95": 3,
+      "max": 13
+    },
+    "sections_webgl2_1.000": {
+      "bg": 0,
+      "balls": 1.06,
+      "rings": 0.19,
+      "impacts": 0.04,
+      "gold": 0.01,
+      "pistons": 0.47,
+      "overlay": 0.03,
+      "counter": 0.41,
+      "outro": 0.04
+    },
+    "flush_webgl2_1.000": 2736.8,
+    "frame_webgl2_1.000": {
+      "p50": 0.6,
+      "p95": 8.5,
+      "max": 180.9
+    },
+    "sections_canvas2d_1.000": {
+      "bg": 0,
+      "balls": 31.74,
+      "rings": 0.09,
+      "impacts": 0.02,
+      "gold": 0.01,
+      "pistons": 0.05,
+      "overlay": 0.01,
+      "counter": 0.13,
+      "outro": 0.01
+    },
+    "flush_canvas2d_1.000": 1308.4,
+    "frame_canvas2d_1.000": {
+      "p50": 19.2,
+      "p95": 78.5,
+      "max": 536
+    }
+  },
+  "pngFrames": [
+    0,
+    60,
+    300,
+    480,
+    600,
+    720,
+    840,
+    960,
+    1041,
+    1071,
+    1371,
+    1520
+  ]
+}
