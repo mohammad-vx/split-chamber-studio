@@ -63,3 +63,15 @@ Autonomous implementation of docs/ARCHITECTURE.md (owner approved, owner away). 
   Node == Electron. Findings fixed on the way: rim only held balls within 2r (escapes), wedge outer edge could
   push balls out, 8 substeps left 12 % deep overlaps under gravity (12 substeps: 1.8 %), coverage check used the
   wrong ball radius for packed scenes (now per-scenario threshold).
+
+## Step 5 — mechanism library (generic machine engine)
+- `src/engine/machines.js` (Packed v2): generic scripted parts (capsule / circle / convex polygon) with pose
+  primitives (rotate, oscillate, slide, swing with escalation, radial contraction); packed.js untouched so
+  rotary-sweeper@1 stays bit-exact. Pinch also recognises two opposing *closing* parts (walls, jaws); hook rule:
+  the first ball splits as soon as a moving part strikes it.
+- New scenarios: jaws@1 (Scissor Jaws), rams@1 (Melodic Rams, escalating swings), kaleidoscope@1
+  (Kaleidoscope Press), walls@1 (Press Walls). Generic `MachineRenderer` (parts clipped to the chamber,
+  breakable rim, peak counter). EN/AR caption templates for every family.
+- Validation: 63/64 seeds pass the run checks (the one failure is a genuine stall the checker rejects);
+  gold-ending videos get a longer finale; pmin 0.005 for these engines; per-scenario emptiness threshold.
+- Unit tests 36/36; goldens for all 7 scenario versions, raw state portable Node == Electron for all new engines.

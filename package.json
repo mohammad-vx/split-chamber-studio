@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/unit/sim.test.mjs tests/unit/engine.test.mjs tests/unit/pipeline.test.mjs tests/unit/packed.test.mjs",
+    "test": "node --test tests/unit/sim.test.mjs tests/unit/engine.test.mjs tests/unit/pipeline.test.mjs tests/unit/packed.test.mjs tests/unit/machines.test.mjs",
     "test:e2e": "playwright test",
     "bench": "electron . --bench",
     "dist": "electron-builder --win",
