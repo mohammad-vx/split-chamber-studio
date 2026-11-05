@@ -5,6 +5,7 @@ import {
   IMMUNE_FRAMES, CHILD_SPREAD, PISTON, PALETTE, GOLD, GOLD_WAVE_SPEED, FINALE_HOLD,
   OUTRO, SAFETY_CAP_SECONDS, CRUSH, DRIFT, plateFace,
 } from './config.js';
+import { splitChance } from '../engine/pacing.js';
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -29,7 +30,7 @@ export class Simulation {
    *               { crush: {floor, boost, knee, squeeze, squeezeN}, finaleHold, outro, safetyCap }
    */
   constructor(seed, params = null) {
-    this.p = { crush: CRUSH, finaleHold: FINALE_HOLD, outro: OUTRO, safetyCap: SAFETY_CAP_SECONDS, ...(params || {}) };
+    this.p = { crush: CRUSH, finaleHold: FINALE_HOLD, outro: OUTRO, safetyCap: SAFETY_CAP_SECONDS, startSpeed: BASE_SPEED, ...(params || {}) };
     this.seed = seed >>> 0;
     this.rand = mulberry32(this.seed);
     const n = MAX_BALLS;
@@ -48,7 +49,7 @@ export class Simulation {
     const r = this.rand;
     const a = (r() < 0.5 ? 0.5 : 1.5) * Math.PI + (r() - 0.5) * 0.4; // up/down the top-bottom lane
     this.spawn(ARENA.cx + (r() - 0.5) * 40, ARENA.cy + (r() - 0.5) * 80,
-      Math.cos(a) * BASE_SPEED, Math.sin(a) * BASE_SPEED, 0, 0);
+      Math.cos(a) * this.p.startSpeed, Math.sin(a) * this.p.startSpeed, 0, 0);
     this.age[0] = 255;
     this.prevFace = [plateFace(0, 0), plateFace(1, 0)];
   }
@@ -125,7 +126,7 @@ export class Simulation {
       for (let k = 0; k < crush.length; k += 2) {
         const i = crush[k];
         if (this.immune[i] !== 0) continue;
-        if (this.capFrame >= 0 || this.rand() > crushChance(this.count, this.p.crush)) { this.eject(i, crush[k + 1]); continue; }
+        if (this.capFrame >= 0 || this.rand() > this.chance(f)) { this.eject(i, crush[k + 1]); continue; }
         this.split(i, crush[k + 1], f);
       }
     }
@@ -164,6 +165,11 @@ export class Simulation {
     if (f === this.outroFrame) this.flags |= FLAG_OUTRO;
     this.frame++;
     return f;
+  }
+
+  /** Split probability: v1 count schedule, or the pacing controller when params.pacing is set (@2+). */
+  chance(f) {
+    return this.p.pacing ? splitChance(this.count, (f + 1) / FPS, this.p.pacing, MAX_BALLS) : crushChance(this.count, this.p.crush);
   }
 
   split(i, pair, f) {

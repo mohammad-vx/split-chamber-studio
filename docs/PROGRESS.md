@@ -25,3 +25,20 @@ Autonomous implementation of docs/ARCHITECTURE.md (owner approved, owner away). 
   Added a **pacing controller**: split chance = f(count vs target curve maxBalls^(t/capTime)); caps land within
   ~1 s of the planned time for all seeds. This will be reused by later engines.
 - Orbit raw state is bit-identical in Node and Electron (rawPortable). Goldens in `baseline/goldens/`.
+
+## Step 3 — pipeline, library, music, captions, home screen (in progress)
+- `src/sim/run.js`: headless RunSummary + Timeline + per-frame state hashes; export worker re-simulates in
+  lockstep and aborts on any hash mismatch (no full frame storage; 48-frame lookback ring).
+- Audio v2: tempo-locked procedural music (`src/audio/music.js`), JS EBU R128 loudness + look-ahead limiter
+  (`src/audio/loudness.js`); ffmpeg ebur128 on the encoded file is the authoritative check.
+- Captions EN/AR (`src/render/captions.js`), render-time layer, Western digits.
+- Main process: `lib/library.js` (atomic status.json, lock file, recovery, quota, rejected log, queue),
+  `lib/media.js` (ebur128/silence, freeze/black detect, dHash, thumbnails, SSIM/PSNR quality gate),
+  `lib/studio-ipc.js` (IPC surface, lib:// protocol, power blocker, battery state, CLI).
+- Pipeline (`src/pipeline/`): generate → headless → checks → audio → 540x960@60 preview → analysis → dedup →
+  candidate; accept → 50 Mbps master per engine with quality gate + video-stream bitrate check.
+- Findings from the first CLI runs (fixed): scenarios on audio v1 had silence/low loudness (now audio v2);
+  orbit balls could escape beyond the blades (blades now reach the rim); co-rotating orbits and blade
+  "bounces" turned balls into riders that were never cut (now always counter-rotating, bounce is radial);
+  first-cut hook guaranteed; split-chamber@2 first ball starts slow so the first press catches it.
+  Validation: 0/60 orbit seeds and 0/40 split@2 seeds fail the run checks (hook limit 3.0 s).

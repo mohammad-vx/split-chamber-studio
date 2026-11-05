@@ -4,6 +4,8 @@ import { encodeFrame, makeMeta, serializeSession, parseSession, hashFrames } fro
 import { createRenderer } from '../render/factory.js';
 import { getScenario, configOf, DEFAULT_SCENARIO } from '../scenarios/index.js';
 import { createLegacySim } from '../scenarios/split-chamber.js';
+import { createStudio } from './studio.js';
+import { Pipeline } from '../pipeline/pipeline.js';
 import { Synth, frameEvents, renderSoundtrack } from '../audio/synth.js';
 import { startExport, ENGINES } from '../export/exporter.js';
 
@@ -283,6 +285,7 @@ $('btn-play').onclick = () => play();
 $('btn-open').onclick = openSession;
 $('btn-folder').onclick = () => host.show(null);
 $('btn-exit').onclick = () => host.quit();
+$('btn-studio').onclick = () => { stopWorker(); state.mode = 'menu'; show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); };
 $('btn-resume').onclick = () => pause(false);
 $('btn-restart').onclick = () => play();
 $('btn-menu1').onclick = toMenu;
@@ -306,6 +309,16 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('beforeunload', () => { if (state.exportJob) state.exportJob.cancel(); });
 
 // ------------------------------------------------------------ boot
+let studio = null;
+
+/** Headless batch: electron . --generate=N [--pattern=key|random] [--captions=en|ar|none] [--seeds=1,2] [--accept-all] */
+async function runCli(cli, debug) {
+  const pipeline = new Pipeline({ debug, onEvent: (ev) => { if (ev.type !== 'stage') host.log('cli', JSON.stringify(ev.type === 'item' ? { id: ev.status.id, status: ev.status.status, reasons: ev.status.reasons } : ev)); } });
+  const results = await pipeline.runBatch({ count: cli.generate, pattern: cli.pattern, captions: cli.captions, seeds: cli.seeds, acceptAll: cli.accept, owner: 'cli' });
+  const brief = results.map((r) => ({ id: r.id, status: r.status, scenario: r.scenario, seed: r.seed, reasons: r.reasons, error: r.error, durationS: r.durationS }));
+  await host.studio.cliDone({ ok: results.length > 0 && results.every((r) => r.status !== 'failed'), results: brief });
+}
+
 async function boot() {
   info = await host.info();
   layout();
@@ -316,6 +329,14 @@ async function boot() {
   state.session = null;
   if (info.cleaned) toast(`Removed ${info.cleaned} incomplete export file(s) from a previous run.`);
   requestAnimationFrame(tick);
+  if (!info.bench && !info.gate) {
+    const sinfo = await host.studio.info();
+    if (sinfo.cli) { runCli(sinfo.cli, sinfo.debug).catch((e) => host.studio.cliDone({ ok: false, error: e.message })); return; }
+    studio = createStudio({ onLivePlay: () => { state.mode = 'menu'; show('menu'); }, toast });
+    show(null);
+    await studio.init();
+    studio.show();
+  }
   if (info.bench) bench(info.bench).catch((e) => { host.log('bench failed', e.message); host.quit(); });
   if (info.gate) runGate(info.gate).catch((e) => host.gateDone({ ok: false, summary: `gate crashed: ${e.message}` }));
 }

@@ -20,9 +20,12 @@ const args = process.argv.slice(1);
 const argVal = (name) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; };
 const BENCH = args.includes('--bench');
 const GATE = args.includes('--gate');
-const HEADLESS = BENCH || GATE;
+const GENERATE = !!argVal('generate');
+const HEADLESS = BENCH || GATE || GENERATE;
 
 let win = null;
+let studio = null;
+const { registerStudio } = require('./lib/studio-ipc');
 const jobs = new Map();
 let logFile = null;
 
@@ -39,11 +42,12 @@ const dirs = () => {
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  { scheme: 'lib', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 560, height: 980, minWidth: 360, minHeight: 560,
+    width: 1180, height: 900, minWidth: 720, minHeight: 600,
     useContentSize: true, backgroundColor: '#05070b', autoHideMenuBar: true,
     title: 'Split Chamber', show: !HEADLESS,
     icon: path.join(ROOT, 'build', 'icon.png'),
@@ -75,6 +79,7 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(abs).toString());
   });
   log('start', { version: app.getVersion(), electron: process.versions.electron, ffmpeg: FFMPEG, videos });
+  studio = registerStudio({ FFMPEG, argVal, args, log });
   createWindow();
 });
 
@@ -147,13 +152,13 @@ async function probeEncoders() {
 
 async function ffprobe(file) {
   const { stdout } = await run(FFPROBE, ['-v', 'error', '-count_frames',
-    '-show_entries', 'stream=index,codec_type,codec_name,profile,width,height,pix_fmt,r_frame_rate,avg_frame_rate,nb_read_frames,duration,sample_rate,channels,color_space,color_range:format=duration,size,bit_rate',
+    '-show_entries', 'stream=index,codec_type,codec_name,profile,width,height,pix_fmt,r_frame_rate,avg_frame_rate,nb_read_frames,duration,bit_rate,sample_rate,channels,color_space,color_range:format=duration,size,bit_rate',
     '-of', 'json', file], { timeout: 180000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
   return JSON.parse(stdout);
 }
 
 /** Checks the finished file against what the session says it must be. */
-async function verify(file, frameCount) {
+async function verify(file, frameCount, exp = { w: W, h: H }) {
   const problems = [];
   let info;
   try { info = await ffprobe(file); } catch (e) { return { ok: false, problems: [`ffprobe could not open the file: ${e.message}`] }; }
@@ -163,7 +168,7 @@ async function verify(file, frameCount) {
   if (!v) problems.push('no video stream');
   else {
     if (v.codec_name !== 'h264') problems.push(`video codec ${v.codec_name}`);
-    if (v.width !== W || v.height !== H) problems.push(`resolution ${v.width}x${v.height}`);
+    if (v.width !== exp.w || v.height !== exp.h) problems.push(`resolution ${v.width}x${v.height} (expected ${exp.w}x${exp.h})`);
     if (v.r_frame_rate !== '60/1') problems.push(`r_frame_rate ${v.r_frame_rate}`);
     if (v.avg_frame_rate !== '60/1') problems.push(`avg_frame_rate ${v.avg_frame_rate}`);
     if (Number(v.nb_read_frames) !== frameCount) problems.push(`frames ${v.nb_read_frames} != ${frameCount}`);
@@ -184,6 +189,7 @@ async function verify(file, frameCount) {
       color: `${v.color_space || '?'}/${v.color_range || '?'}`,
       audio: a ? `${a.codec_name} ${a.sample_rate} Hz ${a.channels}ch ${Number(a.duration).toFixed(3)}s` : 'none',
       sizeMB: +(size / 1e6).toFixed(1), bitrateMbps: +(Number(info.format.bit_rate) / 1e6).toFixed(1),
+      videoMbps: +(Number(v.bit_rate) / 1e6).toFixed(2),
     },
   };
 }
@@ -251,21 +257,25 @@ ipcMain.handle('export:begin', async (_e, opts) => {
   const { videos } = dirs();
   const { seed, frameCount, mode, encoder, bitrateMbps, audio } = opts;
   const durS = frameCount / FPS;
-  const need = durS * bitrateMbps * 1.6 / 8 * 1e6 + durS * 48000 * 8 + 200e6;
+  const exp = opts.expected || { w: W, h: H };
+  const need = durS * bitrateMbps * 2.2 / 8 * 1e6 + durS * 48000 * 8 + 200e6; // part + remux copies + WAV
   const free = await freeBytes(videos);
   if (free !== null && free < need) throw new Error(`Not enough disk space: ${(free / 1e9).toFixed(2)} GB free, about ${(need / 1e9).toFixed(2)} GB needed.`);
   const finalPath = opts.finalPath || await uniquePath(videos, `SplitChamber_${stamp()}_seed${seed}`, '.mp4');
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await fsp.mkdir(path.dirname(finalPath), { recursive: true }); // B1: bench/custom paths may not exist yet
-  const job = { id, mode, encoder, frameCount, finalPath, part: `${finalPath}.part.mp4`, wav: `${finalPath}.wav.tmp`, remux: null, written: 0, t0: Date.now() };
+  const job = { id, mode, encoder, frameCount, finalPath, part: `${finalPath}.part.mp4`, wav: `${finalPath}.wav.tmp`, remux: null, written: 0, t0: Date.now(),
+    exp, metadata: opts.metadata || null, requestedMbps: bitrateMbps,
+    rateControlled: mode === 'mediabunny' || (encoder !== 'libx264' && encoder !== 'lossless'),
+    minBitrateRatio: opts.minBitrateRatio != null ? opts.minBitrateRatio : 0.6 };
   jobs.set(id, job);
   await writeWav(job.wav, audio.channels, audio.sampleRate);
   if (mode === 'ffmpeg') {
     job.proc = ffmpegProc(['-hide_banner', '-loglevel', 'error', '-y',
-      '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-framerate', String(FPS), '-i', 'pipe:0',
+      '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${exp.w}x${exp.h}`, '-framerate', String(FPS), '-i', 'pipe:0',
       '-i', job.wav, '-map', '0:v:0', '-map', '1:a:0',
       ...videoArgs(encoder, bitrateMbps), ...COLOR, '-r', String(FPS), '-fps_mode', 'cfr',
-      '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-f', 'mp4', job.part]);
+      '-c:a', 'aac', '-b:a', '192k', ...(job.metadata ? ['-metadata', `comment=${job.metadata}`] : []), '-movflags', '+faststart', '-f', 'mp4', job.part]);
     job.proc.done.catch((e) => { job.failed = e; });
   } else {
     job.fd = await fsp.open(job.part, 'w');
@@ -317,12 +327,17 @@ ipcMain.handle('export:finish', async (_e, id, info) => {
       const argv = ['-hide_banner', '-loglevel', 'error', '-y', '-i', j.part];
       if (info.audioMuxed) argv.push('-map', '0:v:0', '-map', '0:a:0', '-c', 'copy');
       else argv.push('-i', j.wav, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k');
+      if (j.metadata) argv.push('-metadata', `comment=${j.metadata}`);
       argv.push('-movflags', '+faststart', '-f', 'mp4', j.remux);
       await ffmpegProc(argv).done;
       await fsp.rm(j.part, { force: true });
       j.part = j.remux; j.remux = null;
     }
-    const check = await verify(j.part, j.frameCount);
+    const check = await verify(j.part, j.frameCount, j.exp);
+    if (check.ok && j.rateControlled && j.requestedMbps && check.summary.videoMbps < j.minBitrateRatio * j.requestedMbps) {
+      check.ok = false;
+      check.problems.push(`video bitrate ${check.summary.videoMbps} Mbps is below ${Math.round(j.minBitrateRatio * 100)}% of the requested ${j.requestedMbps} Mbps (encoder ignored the rate)`);
+    }
     if (!check.ok) {
       log('verify failed', id, check.problems);
       const err = new Error(`The video did not pass verification: ${check.problems.join('; ')}`);

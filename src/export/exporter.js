@@ -1,6 +1,6 @@
 // Export orchestrator (renderer thread). Renders the soundtrack offline, drives the export worker,
 // relays encoded bytes / raw frames to the main process and returns the ffprobe-verified result.
-import { renderSoundtrack } from '../audio/synth.js';
+import { renderSoundtrack, renderSoundtrackFor } from '../audio/synth.js';
 
 export const DEFAULT_BITRATE_MBPS = 32;
 
@@ -23,7 +23,9 @@ async function hwEncoder() {
 
 /**
  * Start an export. Returns { promise, cancel }.
- * opts: { engine: 'auto' | key of ENGINES, bitrateMbps, onProgress(p), pngFrames, pngDir, audioBuffer }
+ * session: { meta, frames } (stored frames) or { meta, summary, config } (re-simulate; ARCHITECTURE §7.2)
+ * opts: { engine: 'auto' | key of ENGINES, bitrateMbps, onProgress(p), pngFrames, pngDir, audioBuffer,
+ *         scale (1 = 1080x1920), caption, metadata, finalPath, minBitrateRatio }
  */
 export function startExport(session, opts = {}) {
   let cancelled = false;
@@ -31,8 +33,11 @@ export function startExport(session, opts = {}) {
   const cancel = () => { cancelled = true; if (current) current.cancel(); };
   const promise = (async () => {
     const onProgress = opts.onProgress || (() => {});
-    onProgress({ stage: 'audio', frame: 0, total: session.frames.length });
-    const audioBuffer = opts.audioBuffer || await renderSoundtrack(session);
+    const total = session.summary ? session.summary.frameCount : session.frames.length;
+    onProgress({ stage: 'audio', frame: 0, total });
+    const audioBuffer = opts.audioBuffer || (session.summary
+      ? (await renderSoundtrackFor(session.config, session.summary.timeline, total, session.meta)).buffer
+      : await renderSoundtrack(session));
     const audio = { sampleRate: audioBuffer.sampleRate, channels: [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)] };
     const order = opts.engine && opts.engine !== 'auto' ? [opts.engine] : AUTO_ORDER;
     const attempts = [];
@@ -58,6 +63,8 @@ export function startExport(session, opts = {}) {
 }
 
 function runOnce(session, audio, key, eng, opts, onProgress) {
+  const frameCount = session.summary ? session.summary.frameCount : session.frames.length;
+  const scale = opts.scale || 1;
   const worker = new Worker(new URL('./export.worker.js', import.meta.url), { type: 'module' });
   let jobId = null;
   let stop = null;
@@ -81,7 +88,7 @@ function runOnce(session, audio, key, eng, opts, onProgress) {
         else if (m.type === 'progress') onProgress({ stage: 'video', frame: m.frame, total: m.total, fps: m.fps, engine: key });
         else if (m.type === 'error') fail(new Error(m.message));
         else if (m.type === 'done') {
-          onProgress({ stage: 'verify', frame: session.frames.length, total: session.frames.length });
+          onProgress({ stage: 'verify', frame: frameCount, total: frameCount });
           const res = await window.host.exportFinish(jobId, { audioMuxed: m.audioMuxed });
           settled = true; worker.terminate();
           res.renderSeconds = (performance.now() - t0) / 1000;
@@ -95,12 +102,17 @@ function runOnce(session, audio, key, eng, opts, onProgress) {
     };
     (async () => {
       const job = await window.host.exportBegin({
-        seed: session.meta.seed, frameCount: session.frames.length, mode: eng.mode, encoder: eng.encoder,
+        seed: session.meta.seed, frameCount, mode: eng.mode, encoder: eng.encoder,
         bitrateMbps: opts.bitrateMbps || DEFAULT_BITRATE_MBPS, audio, finalPath: opts.finalPath,
+        expected: { w: Math.round(1080 * scale), h: Math.round(1920 * scale) },
+        metadata: opts.metadata || null, minBitrateRatio: opts.minBitrateRatio,
       });
       jobId = job.id;
       worker.postMessage({
-        type: 'start', mode: eng.mode, meta: session.meta, frames: session.frames, audio,
+        type: 'start', mode: eng.mode, meta: session.meta, audio,
+        source: session.summary ? 'sim' : 'frames', frames: session.summary ? null : session.frames,
+        config: session.config || null, hashes: session.summary ? session.summary.hashes : null,
+        scale, caption: opts.caption || null,
         video: { bitrate: (opts.bitrateMbps || DEFAULT_BITRATE_MBPS) * 1e6, hardwareAcceleration: eng.hw },
         pngFrames: opts.pngFrames || null,
       });

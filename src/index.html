@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: lib:; media-src 'self' blob: lib:; connect-src 'self' lib:">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Split Chamber</title>
+  <title>Split Chamber Studio</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,6 +20,7 @@
       <div class="brand">
         <svg viewBox="-60 -60 120 120" aria-hidden="true"><circle r="52" fill="none" stroke="currentColor" stroke-width="5"/><g fill="#cfd6e0"><rect x="20" y="-18" width="9" height="36" rx="2"/><rect x="-29" y="-18" width="9" height="36" rx="2"/><rect x="-18" y="20" width="36" height="9" rx="2"/><rect x="-18" y="-29" width="36" height="9" rx="2"/></g><circle r="10" fill="#f2b437"/></svg>
         <h1>Split Chamber</h1>
+        <button id="btn-studio" class="ghost small-btn">← Studio</button>
         <p>One ball. Four presses. Every hit splits it in three — until there are ten thousand.</p>
       </div>
       <button id="btn-play" class="primary big">Play</button>
@@ -91,6 +92,46 @@
 
     <div id="toast" class="hidden"></div>
   </div>
+
+  <section id="studio" class="studio hidden">
+    <header class="st-head">
+      <div class="st-brand">
+        <svg viewBox="-60 -60 120 120" aria-hidden="true"><circle r="52" fill="none" stroke="currentColor" stroke-width="6"/><g fill="#cfd6e0"><rect x="20" y="-18" width="9" height="36" rx="2"/><rect x="-29" y="-18" width="9" height="36" rx="2"/><rect x="-18" y="20" width="36" height="9" rx="2"/><rect x="-18" y="-29" width="36" height="9" rx="2"/></g><circle r="10" fill="#f2b437"/></svg>
+        <div><h1>Split Chamber Studio</h1><div class="st-quota"><div class="bar"><div id="st-quota-bar"></div></div><span id="st-quota"></span></div></div>
+      </div>
+      <div class="st-buttons">
+        <button id="st-live" class="ghost">Live play</button>
+        <button id="st-generate" class="primary">+ Generate</button>
+      </div>
+    </header>
+    <div id="st-gen" class="st-gen hidden">
+      <label>Pattern <select id="st-pattern"></select></label>
+      <label>Videos <input id="st-count" type="number" min="1" max="200" value="3"></label>
+      <div id="st-counts" class="row-inline"><button data-n="1">1</button><button data-n="5">5</button><button data-n="10">10</button><button data-n="20">20</button><button data-n="50">50</button></div>
+      <label>Text <select id="st-captions"><option value="none">No text</option><option value="en">English</option><option value="ar">العربية</option></select></label>
+      <button id="st-start" class="primary">Start</button>
+      <button id="st-gen-cancel" class="ghost">Close</button>
+    </div>
+    <div id="st-job" class="st-job hidden">
+      <div><strong id="st-job-label"></strong> <span id="st-job-stage" class="muted"></span></div>
+      <div class="bar"><div id="st-job-progress"></div></div>
+      <button id="st-cancel">Stop</button>
+    </div>
+    <nav class="st-tabs">
+      <button id="st-tab-review" class="on">Waiting for review <b>0</b></button>
+      <button id="st-tab-accepted">Accepted <b>0</b></button>
+      <button id="st-tab-rejected">Rejected <b>0</b></button>
+    </nav>
+    <div class="st-body">
+      <div id="st-grid" class="st-grid"></div>
+      <aside id="st-actions" class="st-actions"></aside>
+    </div>
+    <dialog id="st-player">
+      <video id="st-video" controls playsinline></video>
+      <p id="st-player-info" class="muted small"></p>
+      <button id="st-player-close">Close</button>
+    </dialog>
+  </section>
   <script type="module" src="ui/app.js"></script>
 </body>
 </html>

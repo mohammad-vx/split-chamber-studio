@@ -182,6 +182,7 @@ export class Renderer {
     g.setTransform(s, 0, 0, s, 0, 0);
     lap('overlay');
     this.drawCounter(session, f, fr); lap('counter');
+    if (this.opts.caption) this.drawCaption(f);
     if (meta.outroFrame >= 0 && f >= meta.outroFrame) this.drawOutro(session, f - meta.outroFrame);
     lap('outro');
   }
@@ -303,6 +304,30 @@ export class Renderer {
     if (goldT > 0) { g.shadowColor = `rgba(255,190,60,${0.55 * goldT})`; g.shadowBlur = 36 * this.scale; }
     g.fillStyle = rgb(c);
     g.fillText(fr.n.toLocaleString('en-US'), 0, 0);
+    g.restore();
+  }
+
+  /** Hook caption: fully visible for 3 s, then fades out by 3.6 s. No-op when no caption is set. */
+  drawCaption(f) {
+    const cap = this.opts.caption, t = f / FPS;
+    const a = t < 3 ? 1 : 1 - clamp01((t - 3) / 0.6);
+    if (a <= 0) return;
+    const g = this.ctx;
+    g.save();
+    g.globalAlpha = a;
+    const rtl = cap.lang === 'ar';
+    g.direction = rtl ? 'rtl' : 'ltr';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `600 ${rtl ? 60 : 56}px ${FONT}`;
+    g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 18 * this.scale;
+    g.fillStyle = 'rgba(240,243,248,0.95)';
+    // wrap to at most two lines within 940 px
+    const words = cap.text.split(' '), lines = [];
+    let line = '';
+    for (const w of words) { const test = line ? `${line} ${w}` : w; if (g.measureText(test).width > 940 && line) { lines.push(line); line = w; } else line = test; }
+    if (line) lines.push(line);
+    const y0 = 200 - (lines.length - 1) * 36;
+    lines.slice(0, 2).forEach((l, i) => g.fillText(l, W / 2, y0 + i * 72));
     g.restore();
   }
 

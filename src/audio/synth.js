@@ -4,6 +4,11 @@
 import { FPS } from '../core/constants.js';
 import { mulberry32 } from '../sim/sim.js';
 import { FLAG_HIT_H, FLAG_HIT_V, FLAG_CAP, FLAG_OUTRO } from '../sim/sim.js';
+import { Music, makeMusicPlan, intensityFromTimeline } from './music.js';
+import { master } from './loudness.js';
+import { timelineFromFrames } from '../sim/run.js';
+
+export const FLAG_BEAT = 16;
 
 export const SAMPLE_RATE = 48000;
 
@@ -30,6 +35,15 @@ export class Synth {
     if (fr.crushed > 0) this.pops(when, fr.crushed, f);
     if (fr.flags & FLAG_CAP) this.chime(when);
     if (fr.flags & FLAG_OUTRO) this.swell(when);
+    if (fr.flags & FLAG_BEAT) this.swoosh(when);
+  }
+
+  swoosh(when) {
+    const c = this.ctx, n = c.createBufferSource(); n.buffer = this.noise;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(900, when); bp.frequency.exponentialRampToValueAtTime(3200, when + 0.18);
+    const g = this.env(when, 0.06, 0.05, 0.16);
+    n.connect(bp).connect(g).connect(this.master); n.start(when, 0.3, 0.25);
   }
 
   env(when, peak, attack, decay) {
@@ -116,12 +130,42 @@ export function frameEvents(buf) {
   return { flags: h[2], crushed: h[3] };
 }
 
-/** Render the whole soundtrack offline. Returns an AudioBuffer exactly frameCount/FPS seconds long. */
-export async function renderSoundtrack(session) {
-  const n = session.frames.length;
-  const length = Math.round(n / FPS * SAMPLE_RATE);
+/** Does this config use the v2 audio (music + mastering)? split-chamber@1 keeps the frozen v1 audio. */
+export const hasMusic = (config) => !!(config && config.versions && config.versions.audio >= 2 && config.tempo);
+
+/**
+ * Render a run's soundtrack offline from its Timeline (ARCHITECTURE §5.2): SFX + (v2) tempo-locked music,
+ * then (v2) loudness normalization to -14 LUFS with a -1.5 dBFS look-ahead limiter.
+ * Returns { buffer: AudioBuffer, stats }.
+ */
+export async function renderSoundtrackFor(config, timeline, frameCount, meta = {}) {
+  const length = Math.round(frameCount / FPS * SAMPLE_RATE);
   const ctx = new OfflineAudioContext(2, length, SAMPLE_RATE);
   const synth = new Synth(ctx);
-  for (let f = 0; f < n; f++) synth.frame(frameEvents(session.frames[f]), f, f / FPS);
-  return ctx.startRendering();
+  for (let f = 0; f < frameCount; f++) {
+    synth.frame({ flags: timeline.flags[f], crushed: timeline.crushed[f] }, f, f / FPS);
+  }
+  const music = hasMusic(config);
+  if (music) {
+    const plan = makeMusicPlan(config);
+    const m = new Music(ctx, synth.master, plan, synth.noise);
+    const total = Math.ceil(frameCount / FPS / m.step);
+    m.schedule(0, total, (t) => t, {
+      intensity: intensityFromTimeline(timeline),
+      capT: meta.capFrame >= 0 ? meta.capFrame / FPS : -1,
+      outroT: meta.outroFrame >= 0 ? meta.outroFrame / FPS : -1,
+      endT: frameCount / FPS,
+    });
+  }
+  const buffer = await ctx.startRendering();
+  let stats = null;
+  if (music) stats = master([buffer.getChannelData(0), buffer.getChannelData(1)], SAMPLE_RATE);
+  return { buffer, stats };
+}
+
+/** Render the whole soundtrack offline for a stored session (legacy path). */
+export async function renderSoundtrack(session) {
+  const config = session.meta && session.meta.config;
+  const { buffer } = await renderSoundtrackFor(config, timelineFromFrames(session.frames), session.frames.length, session.meta || {});
+  return buffer;
 }

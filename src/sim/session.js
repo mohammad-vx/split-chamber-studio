@@ -108,3 +108,11 @@ export function hashFrames(frames) {
 
 function q(v) { const k = Math.round(v * POS_SCALE); return k < 0 ? 0 : k > 65535 ? 65535 : k; }
 function align4(n) { return (n + 3) & ~3; }
+
+/** FNV-1a 32-bit of one encoded frame as a number (per-frame state hash, ARCHITECTURE §5.1). */
+export function frameHash32(buf) {
+  const b = new Uint8Array(buf);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}

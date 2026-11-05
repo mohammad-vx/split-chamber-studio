@@ -3,26 +3,15 @@
 // Determinism: only IEEE basic ops + dsin/dcos (src/engine/dmath.js); counter-based RNG; fixed iteration
 // order. Time convention (ARCHITECTURE §4.6): the state of frame f is the state at t = (f+1)/FPS.
 import { FPS } from '../core/constants.js';
-import { dsin, dcos, dexp, dlog } from './dmath.js';
+import { dsin, dcos } from './dmath.js';
+import { splitChance } from './pacing.js';
+export { splitChance };
 import { rand } from './rng.js';
 import { FLAG_CAP, FLAG_OUTRO } from '../sim/sim.js';
 
 export const FLAG_BEAT = 16;      // a blade passed the top (used for music/impact accents)
 export const GOLD_INDEX = 10;     // matches the v1 palette layout (10 colours + gold)
 const P_SPLIT = 1, P_ANGLE = 2, P_SPEED = 3, P_RADIAL = 4, P_BOUNCE = 5;
-
-/**
- * Pacing controller: probability that a cut ball splits, from how far the count is behind/ahead of the target
- * curve N*(t) = maxBalls^(t / capTime). Keeps the climax near capTime whatever the mechanism parameters.
- * Pure function of (count, t, pacing) -> deterministic.
- */
-export function splitChance(count, t, pacing, maxBalls) {
-  const u = Math.min(1, t / pacing.capTime);
-  const target = dexp(dlog(maxBalls) * u);
-  const ratio = target / count;
-  const p = pacing.p0 * ratio * ratio;
-  return p < pacing.pmin ? pacing.pmin : p > 1 ? 1 : p;
-}
 
 /** Blade angle (radians) at time t: shared by sim and renderer. */
 export function bladeAngle(blades, k, t) {
@@ -46,7 +35,7 @@ export class OrbitSim {
     this.splits = []; this.flags = 0; this.crushed = 0;
     this.substeps = c.substeps;
     // first ball on a circular orbit
-    const a0 = rand(this.seed, 0, 0, P_ANGLE) * 6.283185307179586;
+    const a0 = c.startAngle != null ? c.startAngle : rand(this.seed, 0, 0, P_ANGLE) * 6.283185307179586;
     const r0 = c.startRadius;
     const vc = Math.sqrt(this.accel(r0) * r0);
     this.spawn(c.arena.cx + dcos(a0) * r0, c.arena.cy + dsin(a0) * r0, -dsin(a0) * vc * c.dir, dcos(a0) * vc * c.dir, 0, 0);
@@ -127,7 +116,7 @@ export class OrbitSim {
       for (let q = 0; q < hits.length; q += 3) {
         const i = hits[q], k = hits[q + 1], radial = hits[q + 2];
         if (this.immune[i] !== 0) continue;
-        const p = splitChance(this.count, t, c.pacing, c.maxBalls);
+        const p = this.count === 1 ? 1 : splitChance(this.count, t, c.pacing, c.maxBalls);   // the first cut always splits (hook)
         if (!capped && rand(this.seed, this.id[i], step, P_SPLIT) < p && this.count < c.maxBalls) this.split(i, k, step, radial);
         else this.bounce(i, k, radial, step);
       }
@@ -191,16 +180,14 @@ export class OrbitSim {
   }
 
   bounce(i, k, radial, step) {
-    // the blade swats the ball: reflect the velocity component normal to the blade, relative to the blade
-    const c = this.cfg, b = c.blades;
-    const t = (step + 1) / (FPS * this.substeps);
-    const a = bladeAngle(b, k, t);
-    const nx = -dsin(a), ny = dcos(a);                  // blade normal (direction of travel for dir=+1)
-    const vb = this.bladeVel(k, radial);
-    const vrel = this.vx[i] * nx + this.vy[i] * ny - vb;
-    const e = 0.6 + rand(this.seed, this.id[i], step, P_BOUNCE) * 0.2;
-    const dv = -(1 + e) * vrel;
-    this.vx[i] += dv * nx; this.vy[i] += dv * ny;
+    // A cut that does not split deflects the ball radially and slows it slightly. The orbit direction is kept:
+    // reflecting relative to the blade would turn balls into co-rotating riders that are almost never cut again.
+    const c = this.cfg, { cx, cy } = c.arena;
+    const dx = this.x[i] - cx, dy = this.y[i] - cy, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const kick = (rand(this.seed, this.id[i], step, P_BOUNCE) - 0.5) * 3 * c.radialKick;
+    this.vx[i] = this.vx[i] * 0.92 + dx / d * kick;
+    this.vy[i] = this.vy[i] * 0.92 + dy / d * kick;
     this.immune[i] = Math.max(this.immune[i], 6);
   }
+
 }
