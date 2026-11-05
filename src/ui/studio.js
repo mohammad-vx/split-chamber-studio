@@ -5,7 +5,7 @@ import { Pipeline } from '../pipeline/pipeline.js';
 
 const $ = (id) => document.getElementById(id);
 const S = () => window.host.studio;
-const fmtGB = (b) => (b / 1e9).toFixed(2);
+const fmtGB = (b) => (b / 1024 ** 3).toFixed(2);   // quota is 12 GiB; show it as 12.00 GB
 const REASONS = ['boring', 'too similar', 'glitch', 'audio', 'other'];
 
 export function createStudio({ onLivePlay, toast }) {
@@ -13,8 +13,11 @@ export function createStudio({ onLivePlay, toast }) {
 
   function itemsFor(tab) {
     const want = tab === 'review' ? ['candidate', 'mastering'] : tab === 'accepted' ? ['accepted'] : ['rejected', 'failed'];
-    const list = state.items.filter((x) => want.includes(x.status));
-    if (tab === 'review') list.sort((a, b) => (b.score || 0) - (a.score || 0));
+    const pat = $('st-filter-pattern').value, q = $('st-search').value.trim(), sort = $('st-sort').value;
+    const list = state.items.filter((x) => want.includes(x.status) && (!pat || x.scenario === pat)
+      && (!q || String(x.seed).includes(q) || String(x.id).startsWith(q)));
+    const by = { score: (a, b) => (b.score || 0) - (a.score || 0), new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)), duration: (a, b) => (b.durationS || 0) - (a.durationS || 0) };
+    list.sort(by[sort] || by.score);
     return list;
   }
 
@@ -24,6 +27,11 @@ export function createStudio({ onLivePlay, toast }) {
     $('st-quota').textContent = `${fmtGB(u.bytes)} / ${fmtGB(u.quotaBytes)} GB · about ${Math.max(0, Math.floor(u.freeBytes / (50e6 / 8 * 40)))} more 40 s masters fit`;
     $('st-quota-bar').style.width = `${Math.min(100, u.bytes / u.quotaBytes * 100).toFixed(1)}%`;
     for (const t of ['review', 'accepted', 'rejected']) $(`st-tab-${t}`).querySelector('b').textContent = itemsFor(t).length;
+    const all = state.items, acc = all.filter((x) => x.status === 'accepted').length, rev = all.filter((x) => x.status === 'rejected' && x.rejectedAt === 'review').length;
+    const auto = all.filter((x) => x.status === 'rejected' && x.rejectedAt !== 'review').length, failed = all.filter((x) => x.status === 'failed').length;
+    const times = all.map((x) => x.timings && x.timings.totalS).filter(Boolean);
+    $('st-stats').textContent = `${all.length} generated · ${acc} accepted · ${rev} rejected by you · ${auto} auto-rejected · ${failed} failed`
+      + (acc + rev ? ` · acceptance ${Math.round(acc / (acc + rev) * 100)} %` : '') + (times.length ? ` · avg ${(times.reduce((a, b) => a + b, 0) / times.length).toFixed(0)} s per candidate` : '');
     render();
   }
 
@@ -35,7 +43,7 @@ export function createStudio({ onLivePlay, toast }) {
     const reasons = (it.reasons || []).slice(0, 2).map((r) => `<li>${r}</li>`).join('');
     el.innerHTML = `${thumb}<div class="meta"><strong>${it.label || it.scenario}</strong>
       <span>seed ${it.seed}${it.durationS ? ` · ${it.durationS.toFixed(1)} s` : ''}${it.score != null ? ` · score ${it.score}` : ''}</span>
-      ${it.caption ? `<span class="cap">${it.caption.lang.toUpperCase()}: ${it.caption.text}</span>` : ''}
+      ${it.caption ? `<span class="cap">${it.caption.lang.toUpperCase()}: <bdi dir="auto">${it.caption.text}</bdi></span>` : ''}
       ${reasons ? `<ul class="why">${reasons}</ul>` : ''}${it.lastError ? `<ul class="why"><li>${it.lastError.split('\n')[0]}</li></ul>` : ''}</div>`;
     el.onclick = () => { state.sel = i; render(); };
     el.ondblclick = () => open(it);
@@ -80,6 +88,10 @@ export function createStudio({ onLivePlay, toast }) {
         if (!have && (!it.caption || it.caption.lang !== lang)) btn(`Export ${lang === 'none' ? 'no-text' : lang.toUpperCase()} version`, () => run(`Exporting ${lang} version`, () => state.pipeline.accept(it.id, { lang })));
       }
       btn('📁 Open folder', () => window.host.show(null));
+      if (it.masters && Object.keys(it.masters).length) btn('🗑 Delete master (keep reproducible)', () => run('Deleting master', async () => {
+        await S().removeMedia(it.id, ['master']);
+        await S().update(it.id, { masters: {}, note: 'master deleted to save space — Reproduce re-renders it' });
+      }));
     }
     if (it.status === 'accepted' || it.status === 'candidate' || it.status === 'rejected') {
       btn('✦ New variation', () => run('Generating a variation', () => state.pipeline.variation(it.id)));
@@ -145,9 +157,10 @@ export function createStudio({ onLivePlay, toast }) {
     generatePanel(false);
     state.tab = 'review';
     await run(`Generating ${count} video${count > 1 ? 's' : ''}`, async () => {
-      const res = await state.pipeline.runBatch({ count, pattern, captions, owner: 'ui' });
-      const ok = res.filter((r) => r.status === 'candidate').length;
-      toast(`Batch finished: ${ok} candidate${ok === 1 ? '' : 's'} ready for review, ${res.length - ok} rejected or failed.`, 6000);
+      const autoAcceptScore = $('st-auto').checked ? Number($('st-auto-score').value) : null;
+      const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, owner: 'ui' });
+      const ok = res.filter((r) => r.status === 'candidate').length, accd = res.filter((r) => r.status === 'accepted').length;
+      toast(`Batch finished: ${ok} waiting for review${accd ? `, ${accd} auto-accepted` : ''}, ${res.length - ok - accd} rejected or failed.`, 6000);
     });
   }
 
@@ -169,6 +182,9 @@ export function createStudio({ onLivePlay, toast }) {
     state.pipeline = new Pipeline({ onEvent, debug: state.debug });
     const sel = $('st-pattern');
     sel.innerHTML = '<option value="random">Random pattern</option>' + listedScenarios().map((s) => `<option value="${s.key}">${s.label}</option>`).join('');
+    $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + listedScenarios().map((s) => `<option value="${s.key}">${s.label}</option>`).join('');
+    for (const id of ['st-filter-pattern', 'st-sort']) $(id).onchange = () => { state.sel = 0; render(); };
+    $('st-search').oninput = () => { state.sel = 0; render(); };
     for (const t of ['review', 'accepted', 'rejected']) $(`st-tab-${t}`).onclick = () => { state.tab = t; state.sel = 0; render(); };
     $('st-generate').onclick = () => generatePanel($('st-gen').classList.contains('hidden'));
     $('st-start').onclick = startBatch;

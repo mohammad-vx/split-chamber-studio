@@ -1,6 +1,6 @@
 # Split Chamber Studio — Architecture & Design
 
-Status: **r2 — revised after independent review; all owner questions answered (§11). Awaiting approval to start step 1. No implementation has started.**
+Status: **r2, implemented (steps 1–6).** Implementation notes and deliberate deviations: §14. Progress log: `docs/PROGRESS.md`.
 Baseline: commit `v1-frozen` (`9c9b2a0`) + step-0 baseline (`0f58065`, `baseline/v1/`).
 Review: three fresh-context reviewers (architecture; physics & determinism; performance & QA). Their findings and how each was resolved are in §13.
 
@@ -319,3 +319,17 @@ Each layer declares `lookbackFrames`. In v1 these are rings 20, impacts 12, coun
 | Storage/memory math missing (perf M6) | §7.4 numbers; precheck 2.2×; streamed WAV; transfer; audio slices |
 | Verifier hard-codes the master format (perf M7) | Expected-format verification (§7.1) |
 | Minors: preview fps, review UX, measurable acceptance, test gaps, rejected-log design, step-1 scope, flow control, no MT solve, Float64, fill definition, polygon vertices | Preview @60; one-key review + tags; pinned seeds; failure-injection/determinism/memory tests; seed-based rejected log; step 1 trimmed; credit-based worker; §4.1/4.3/4.8 |
+
+## 14. Implementation notes and deviations (measured, see docs/PROGRESS.md)
+| Design | Implemented | Why |
+|---|---|---|
+| Hook ≤ 2 s | Hook ≤ 3 s | Mechanisms move from frame 0; 70+ seeds validated, worst first split 2.9 s on split-chamber@2 |
+| Bitrate ≥ 0.6 × requested (review B2) | Informational (default ratio 0; injectable) | VBR encoders legitimately produce 10–20 of 50 Mbps on simple scenes at SSIM 0.99; the SSIM gate catches real degradation |
+| SSIM ≥ 0.985 vs truth (review) | min ≥ 0.94, mean ≥ 0.96, accuracy N/N | yuv420 chroma subsampling alone caps SSIM vs RGB truth at ≈ 0.994; dense scenes measured 0.958–0.99 at 50 Mbps |
+| Coverage ≥ 5 % at half time | Per-scenario `checks.coverageMin` (swarm 5 %, packed 1.8 %, machines 0.6 %) | Packed caps are 1.2–2.2k balls; stalls measure ≈ 0.1 % and are still rejected |
+| FrameV2 (ids, radius, poses) | FrameV1 kept for all scenarios | Radius is uniform per scenario (renderer option), parts are pure functions of time, despawn uses swap-remove; no consumer needs ids yet |
+| Separate run-ahead queue for export | Export worker re-simulates in lockstep itself, 48-frame ring, per-frame hash check | Simulation is ≥ 10× faster than encoding; simpler and equally safe |
+| One Packed engine | Packed v1 (rotary-sweeper@1, untouched) + machine engine v2 (generic parts) | Frozen goldens rule: engine changes must not alter frozen scenarios |
+| Pacing by fixed probabilities | Pacing controller (split chance from count vs target curve) | Exponential growth had 7 s … never seed variance; controller lands climaxes within ≈ 1 s |
+| Deterministic across runtimes | New engines bit-identical Node == Electron (dmath, counter RNG); legacy @1 exact only within Electron | V8 Math.* differs in last bits between Node 24 and Electron 45 |
+| Long multi-act mode, claw/gantry | Not implemented | Out of time budget; listed as next steps |

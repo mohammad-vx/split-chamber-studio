@@ -1,81 +1,84 @@
-# Split Chamber
+# Split Chamber Studio
 
-One ball sits in a round chamber with four steel presses. Each time a pair of presses slams shut, any ball caught between them splits into three. The count climbs from 1 to 10,000 in about 16 seconds. Then the whole swarm turns gold and an end card fades in.
+A desktop tool that **generates satisfying ball-simulation videos automatically**. You choose a pattern, how many videos you want and the caption language, then press **Generate**. Every video is:
 
-The app has two separate modes:
+- simulated deterministically, so it can be reproduced exactly from its seed;
+- checked automatically (length, a hook in the first seconds, stability, emptiness, loudness, frozen picture, duplicates);
+- rendered as a small preview for you to review.
 
-| | What happens | Cost |
-|---|---|---|
-| **Play** | The simulation runs live, with sound. | No recording or encoding. |
-| **Export** | After a run, a high-quality video is rendered offline, one frame at a time, from the saved session data. | Takes about 45 s for a 25 s video on an Intel i3 laptop. The game stays responsive meanwhile. |
+Videos you accept are rendered as a verified **1080×1920 · 60 fps** master with synchronized sound effects and music.
 
-Every finished run is saved as a small **session file**. You can replay or export it at any time, even after closing the app, and the simulation never runs again.
+The original game, Split Chamber (live play, sessions, manual export), is still available through **Live play**.
 
 ---
 
 ## Start it
 
-**Option A: portable app (recommended).** Run `dist\SplitChamber-1.0.0-portable.exe`. Nothing to install.
+- **Portable:** `dist\SplitChamberStudio-2.0.0-portable.exe`. Nothing to install.
+- **Installer:** `dist\SplitChamberStudio-2.0.0-setup.exe`.
+- **From the project folder:** double-click `Start Split Chamber.bat`. This needs `npm install` to have been run once.
 
-**Option B: installer.** Run `dist\SplitChamber-1.0.0-setup.exe`. It adds a Start-menu entry.
+## Making videos
 
-**Option C: from the project folder.** Double-click **`Start Split Chamber.bat`**. This needs `npm install` to have been run once.
+1. Press **+ Generate**.
+2. Choose a **pattern** (or *Random*), the **number of videos** (1, 5, 10, 20, 50 or any number) and the **text** (English, Arabic or none).
+3. Press **Start**. The bar shows the current video, the stage (simulate, soundtrack, preview, checks) and progress. **Stop** ends the batch.
+4. Candidates appear under **Waiting for review**, sorted by score. Videos that fail a check are rejected automatically, with the reason shown under **Rejected**.
+5. Select a candidate:
+   - **▶ Play** (or Enter) watches the preview.
+   - **✓ Accept** (or A) renders the full master and verifies it.
+   - **✗ Reject** (or R): tick a reason first (boring, too similar, glitch, audio, other).
+6. Accepted videos:
+   - **Reproduce** re-runs the simulation and proves every frame is identical (it re-renders the master if you deleted it).
+   - **Export EN / AR / no-text version** renders the same video with another caption, without re-simulating.
+   - **New variation** generates the same pattern with a new seed.
+   - **Delete master** frees space; the video stays reproducible.
 
-## Controls
+**Auto-accept score ≥ N** (in the Generate panel, off by default) accepts high-scoring candidates without review. That's the "hybrid" mode for when you trust the score.
 
-| Key / button | Action |
+### Patterns
+
+| Pattern | What happens |
 |---|---|
-| **Play** / Space (in the menu) | Start a new run (random seed) |
-| Space | Pause / resume |
-| R | Restart with a new seed |
-| Esc | Pause; press again for the main menu |
-| F | Full screen |
-| E (end screen) | Export video |
+| **Split Chamber** | Four presses; every crushed ball splits into three, until 10,000 balls and a gold finale |
+| **Orbit Crusher** | Balls orbit a gravity well; rotating blades cut the orbits |
+| **Rotary Sweeper** | A rotating arm sweeps colliding balls against wedges; the pile grows until the glass rim breaks |
+| **Scissor Jaws** | V-shaped jaws on a hub open, close and turn |
+| **Melodic Rams** | Two pendulum rams with hammer heads; every swing is a little faster |
+| **Kaleidoscope Press** | Triangles contract into a mandala and release |
+| **Press Walls** | Two walls slide in and squeeze everything between them |
 
-## Making a video
+Videos are **30–45 s** (Split Chamber 30–40 s).
 
-1. In the menu, leave **"Keep session so I can export a video"** switched on (the default).
-2. Press **Play** and watch the run. Nothing is recorded or encoded while you watch.
-3. When the end screen appears, the session is already saved. Press **Export video**.
-4. A progress bar shows frames, encoder speed and time left. When it finishes, the app checks the file with `ffprobe` and only then shows **"✓ Saved and verified"** with the file location. **Show in folder** opens it.
-
-You can also replay first (**Replay**), export the same run again (each export gets a new file name), or open an older run with **Open session…**.
-
-With the switch **off**, nothing is kept in memory and there is nothing to export: the cheapest way to just watch.
-
-### Where files go
+### Where things are
 
 | What | Where |
 |---|---|
-| Videos | `%USERPROFILE%\Videos\Split Chamber\SplitChamber_2026-11-05_18-42-07_seed123456.mp4` |
-| Sessions | `%USERPROFILE%\Videos\Split Chamber\Sessions\*.scsession` (about 30 MB each) |
-| Log | `%APPDATA%\Split Chamber\logs\main.log` |
+| Library (default, change in settings) | `D:\Split Chamber Studio\` — one folder per video in `videos\<id>\` |
+| Per video | `config.json` (everything needed to reproduce), `metrics.json`, `status.json`, `thumb.jpg`, `preview.mp4`, `master.mp4` (accepted only) |
+| Quota | 12 GB (about 50 forty-second masters); the bar at the top shows usage |
+| Live-play exports (old mode) | `%USERPROFILE%\Videos\Split Chamber\` |
+| Log | `%APPDATA%\Split Chamber Studio\logs\main.log` |
 
-Files are never overwritten: a clash gets `_2`, `_3`, and so on. An export is written to a temporary `.part` file and renamed only after it passes verification. Leftover partial files from a crash are cleaned up the next time the app starts. Your session is unaffected, so you can simply export again.
+### What is checked automatically
 
-### Video format
+| Stage | Checks |
+|---|---|
+| Simulation | Stable (no invalid numbers), reaches its climax, length within the pattern's range, first split within 3 s, scene not empty |
+| Preview (encoded file) | Loudness −17…−13 LUFS, true peak ≤ −1 dBTP, no silence over 1.5 s, no frozen or black picture over 1 s, not too similar to an accepted video (growth curve + perceptual frame hashes) |
+| Master | Exact resolution, 60/1 fps, exact frame count (every frame decoded), duration, audio; SSIM ≥ 0.94 (min) / 0.96 (mean) against frames rendered directly by the engine; frame accuracy N/N; loudness re-checked. Every re-simulation must reproduce the per-frame state hashes of the original run. |
 
-* 1080 × 1920 (9:16 vertical), exactly 60 fps, constant frame rate
-* H.264 High, yuv420p, BT.709 limited range, `+faststart` (ready for Instagram, TikTok, YouTube Shorts)
-* AAC 48 kHz stereo audio, generated from the same session data, so it is sample-accurate to the picture
-* 32 Mbps by default; **Advanced → Quality** offers 24 or 45 Mbps
+If an encoder fails a check, the next one is tried: MediaBunny hardware → FFmpeg GPU → MediaBunny software → x264.
 
-After every export the app runs `ffprobe` and checks codec, resolution, both frame-rate fields, exact frame count (every frame is decoded), video duration, pixel format and that the audio duration matches. If any check fails, the file is discarded and the error is shown.
+## Command line
 
-### Encoder choice
+Headless batch: no window, no sound, prints a JSON result line.
 
-**Advanced → Video encoder** defaults to **Automatic**, which tries these in order:
+```bash
+node_modules\electron\dist\electron.exe . --generate=5 --pattern=random --captions=ar
+```
 
-1. **MediaBunny · WebCodecs hardware**: fastest, high quality
-2. **FFmpeg · GPU encoder** (Intel QSV / NVIDIA NVENC / AMD AMF / Media Foundation, whichever works)
-3. **MediaBunny · WebCodecs software**
-4. **FFmpeg · x264** (software, always available)
-
-The first one that works is used. The order comes from measurements on this machine; see [docs/BENCHMARK.md](docs/BENCHMARK.md).
-
-**Advanced → Seed** replays a specific run. The same seed always gives the identical run.
-
----
+Options: `--pattern=<key>` (`split-chamber@2`, `orbit-crusher@1`, `rotary-sweeper@1`, `jaws@1`, `rams@1`, `kaleidoscope@1`, `walls@1`), `--seeds=1,2,3`, `--accept-all`, `--library=<folder>`, `--quota-mb=<n>`, `--mute`.
 
 ## For developers
 
@@ -84,11 +87,15 @@ npm install
 ```
 
 ```bash
-npm start
+npm test
 ```
 
 ```bash
-npm test
+npm run gate
+```
+
+```bash
+npm run gate:pixels
 ```
 
 ```bash
@@ -99,49 +106,25 @@ npm run test:e2e
 npm run dist
 ```
 
-`npm test` runs the unit tests (determinism, session format, physics invariants). `npm run test:e2e` runs the Playwright tests, which drive the real app: play, export, replay, cancel, restart and reopening a session. `npm run dist` builds the portable `.exe` and installer into `dist\`.
+- `npm test`: 36 unit tests.
+- `npm run gate`: determinism gates (Node + Electron, all scenario goldens).
+- `npm run gate:pixels`: byte-exact render check on this machine.
+- `npm run test:e2e`: 14 Playwright tests on the real app (muted).
+- `npm run dist`: portable exe + installer.
 
-Encoder benchmark (writes `results.json`, the MP4s and ground-truth PNGs to the folder you pass):
+Tools: `tools/scenario-check.mjs <key>` (validates seeds against the run checks), `tools/benchmark-pipeline` notes in `docs/BENCHMARK.md`, `tools/compare.mjs` (encoder quality), `tools/pixelgate.mjs`, `tools/goldens.mjs`, `tools/baseline.mjs`.
 
-```bash
-node_modules\electron\dist\electron.exe . --bench --seed=1234 --bench-out=C:\temp\bench --out-dir=C:\temp\bench\out
-```
-
-```bash
-node tools/compare.mjs C:\temp\bench
-```
-
-Other tools: `node tools/simstats.mjs 1 2 3` prints the count-versus-time curve against the reference. `node tools/tune.mjs '[[...]]'` grid-searches the fission constants. `node tools/density.mjs` prints a text density map of the swarm.
-
-See [docs/TECHNICAL.md](docs/TECHNICAL.md) for the architecture.
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Implementation log and findings: [docs/PROGRESS.md](docs/PROGRESS.md). Measurements: [docs/BENCHMARK.md](docs/BENCHMARK.md).
 
 ### Dependencies
 
-| Package | Why |
-|---|---|
-| `electron` 45 | Desktop shell; bundles Chromium (WebGL2, WebCodecs, Web Audio) |
-| `mediabunny` | MP4 muxing + WebCodecs encoding for the primary export path |
-| `ffmpeg-static` (FFmpeg 6.1) | Fallback encoders, lossless remux to `+faststart`, audio mux |
-| `ffprobe-static` | Post-export verification |
-| `electron-builder` (dev) | Portable `.exe` + NSIS installer |
-| `@playwright/test` (dev) | End-to-end tests of the real app |
-
-No OBS, no screen capture, no network access, no external services.
-
-### Agent skills used
-
-Two skills are installed **project-locally** in `.claude/skills/`. They are copied verbatim from the reviewed versions, contain no scripts, and nothing was installed globally:
-
-* `export-video`: from `olivierestevez/oli-skills` (frame-by-frame export with MediaBunny)
-* `electron-builder`: from `pedronauck/skills` (Windows packaging)
-
-Already-installed skills that were reused: `playwright-best-practices` (end-to-end tests) and `systematic-debugging`. `pixijs-performance` was kept as a backup and **not installed**. Canvas 2D profiling did show the ball layer was too slow, but a small WebGL2 point renderer (`src/render/balls-gl.js`) solved it without PixiJS.
+`electron` 45, `mediabunny` (WebCodecs MP4), `ffmpeg-static` (FFmpeg 6.1: fallback encoders, remux, analysis), `ffprobe-static` (verification); dev: `electron-builder`, `@playwright/test`. No network services.
 
 ## Known limitations
 
-* **Windows x64 only** (that is what was built and tested).
-* **Preview smoothness depends on the GPU.** On the Intel UHD test laptop the live preview ran at 47–58 fps. When the screen can't keep up, the preview skips a frame rather than slowing the simulation. **Exports are unaffected** and always contain every frame at exactly 60 fps.
-* **The FFmpeg export paths are slower** (5–13 fps here), because every frame must be read back from the GPU. They exist as fallbacks.
-* The portable `.exe` unpacks itself on every launch, so it starts a few seconds slower than the installed version.
-* The app is not code-signed, so Windows SmartScreen may ask for confirmation the first time ("More info → Run anyway").
-* Sessions store the recorded ball positions, not just the seed, so an old session replays exactly even if the physics changes in a later version. Re-simulating a seed in a different version can give a different run.
+- **Windows x64 only.** Pixel-exact reproduction is guaranteed on the same machine and GPU driver. The simulation itself is bit-exact across Node and Electron for all new engines; the legacy Split Chamber@1 engine is exact only within Electron.
+- **Sound is checked by measurement, not by ear.** Procedural music quality is subjective; your review is the judge.
+- **Packed scenarios hold about 1,200–2,200 balls**, Swarm scenarios 10,000.
+- **About 1 in 60 seeds stalls and is rejected automatically** (by design: the checker exists for that).
+- **The long multi-act mode (up to 3 min) and the claw/gantry mechanism are not built yet.**
+- **The app is not code-signed**, so SmartScreen may ask once ("More info → Run anyway").

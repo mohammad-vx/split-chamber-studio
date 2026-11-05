@@ -75,3 +75,10 @@ Autonomous implementation of docs/ARCHITECTURE.md (owner approved, owner away). 
 - Validation: 63/64 seeds pass the run checks (the one failure is a genuine stall the checker rejects);
   gold-ending videos get a longer finale; pmin 0.005 for these engines; per-scenario emptiness threshold.
 - Unit tests 36/36; goldens for all 7 scenario versions, raw state portable Node == Electron for all new engines.
+
+## Step 6 — dashboard expansion, packaging, documentation
+- Studio: pattern filter, sort (score / newest / longest), seed search, statistics line (acceptance rate,
+  average generation time), optional auto-accept above a score (hybrid mode), delete master (reproducible).
+- Packaging: `dist/SplitChamberStudio-2.0.0-portable.exe` and `-setup.exe`; the packaged app generated and
+  accepted a rams@1 video in 122 s (bundled ffmpeg/ffprobe/MediaBunny all working from the package).
+- Sustained benchmark: 4/4 videos accepted in 410 s (≈ 100 s per finished video). `docs/BENCHMARK.md`.

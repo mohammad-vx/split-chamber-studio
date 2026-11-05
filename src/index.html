@@ -109,6 +109,7 @@
       <label>Videos <input id="st-count" type="number" min="1" max="200" value="3"></label>
       <div id="st-counts" class="row-inline"><button data-n="1">1</button><button data-n="5">5</button><button data-n="10">10</button><button data-n="20">20</button><button data-n="50">50</button></div>
       <label>Text <select id="st-captions"><option value="none">No text</option><option value="en">English</option><option value="ar">العربية</option></select></label>
+      <label class="toggle small"><input type="checkbox" id="st-auto"><span></span>Auto-accept score ≥ <input id="st-auto-score" type="number" min="0" max="100" value="80"></label>
       <button id="st-start" class="primary">Start</button>
       <button id="st-gen-cancel" class="ghost">Close</button>
     </div>
@@ -122,6 +123,12 @@
       <button id="st-tab-accepted">Accepted <b>0</b></button>
       <button id="st-tab-rejected">Rejected <b>0</b></button>
     </nav>
+    <div class="st-filters">
+      <select id="st-filter-pattern"><option value="">All patterns</option></select>
+      <select id="st-sort"><option value="score">Best score</option><option value="new">Newest</option><option value="duration">Longest</option></select>
+      <input id="st-search" type="text" placeholder="Seed or id">
+      <span id="st-stats" class="muted small"></span>
+    </div>
     <div class="st-body">
       <div id="st-grid" class="st-grid"></div>
       <aside id="st-actions" class="st-actions"></aside>

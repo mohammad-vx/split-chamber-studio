@@ -1,8 +1,8 @@
 {
   "name": "split-chamber",
-  "productName": "Split Chamber",
-  "version": "1.0.0",
-  "description": "Deterministic fission-chamber physics simulation with frame-perfect 1080x1920 60 fps video export.",
+  "productName": "Split Chamber Studio",
+  "version": "2.0.0",
+  "description": "Split Chamber Studio: deterministic ball-simulation video factory (generate, check, review, export 1080x1920 60 fps).",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "local.splitchamber.app",
-    "productName": "Split Chamber",
+    "productName": "Split Chamber Studio",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -25,9 +25,11 @@
     "files": [
       "main.js",
       "preload.js",
+      "lib/**/*",
       "src/**/*",
-      "node_modules/mediabunny/dist/**/*",
-      "package.json"
+      "package.json",
+      "build/icon.png",
+      "!**/*.map"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
@@ -51,12 +53,12 @@
       "icon": "build/icon.ico"
     },
     "portable": {
-      "artifactName": "SplitChamber-${version}-portable.exe"
+      "artifactName": "SplitChamberStudio-${version}-portable.exe"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "SplitChamber-${version}-setup.exe"
+      "artifactName": "SplitChamberStudio-${version}-setup.exe"
     }
   },
   "dependencies": {

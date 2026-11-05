@@ -72,7 +72,7 @@ export class Pipeline {
         let st;
         try {
           st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none' });
-          if (st.status === 'candidate' && opts.acceptAll) st = await this.accept(st.id);
+          if (st.status === 'candidate' && (opts.acceptAll || (opts.autoAcceptScore != null && st.score >= opts.autoAcceptScore))) st = await this.accept(st.id);
         } catch (e) {
           if (this.cancelled) break;
           st = { status: 'failed', error: e.message };
