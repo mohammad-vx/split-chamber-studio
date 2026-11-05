@@ -19,10 +19,12 @@ export function checkRun(config, s) {
   if (d && (s.durationS < d.minS || s.durationS > d.maxS)) r.push(`duration ${s.durationS.toFixed(1)} s outside ${d.minS}–${d.maxS} s`);
   if (s.hookFrame < 0 || s.hookFrame / FPS > LIMITS.hookMaxS) r.push(`no hook: first split at ${s.hookFrame < 0 ? 'never' : (s.hookFrame / FPS).toFixed(1) + ' s'} (limit ${LIMITS.hookMaxS} s)`);
   if (s.capFrame < 0) r.push('no climax (ball cap never reached)');
-  const ballR = (config.orbit && config.orbit.ballR) || 6.5, arenaR = (config.orbit && config.orbit.arena.r) || 460;
+  const world = config.orbit || config.packed || {};
+  const ballR = world.ballR || 6.5, arenaR = (world.arena && world.arena.r) || 460;
+  const coverageMin = (config.checks && config.checks.coverageMin) || LIMITS.coverageMin;
   const half = s.timeline.n[Math.floor(s.frameCount / 2)] || 0;
   const coverage = Math.min(1, half * ballR * ballR / (arenaR * arenaR));
-  if (coverage < LIMITS.coverageMin) r.push(`scene too empty at half time (coverage ${(coverage * 100).toFixed(1)} %)`);
+  if (coverage < coverageMin) r.push(`scene too empty at half time (coverage ${(coverage * 100).toFixed(1)} %, minimum ${(coverageMin * 100).toFixed(1)} %)`);
   return r;
 }
 

@@ -67,7 +67,7 @@ test('split-chamber@2 runs 30-40 s and differs from @1', () => {
 });
 
 test('registry: keys, listing, legacy sessions default to @1', () => {
-  assert.deepEqual(Object.keys(SCENARIOS).sort(), ['orbit-crusher@1', 'split-chamber@1', 'split-chamber@2']);
+  for (const k of ['orbit-crusher@1', 'split-chamber@1', 'split-chamber@2', 'rotary-sweeper@1']) assert.ok(SCENARIOS[k], k);
   assert.ok(!listedScenarios().some((s) => s.key === 'split-chamber@1'));
   assert.equal(configOf({ seed: 3 }).scenario, 'split-chamber@1');
   for (const s of listedScenarios()) {

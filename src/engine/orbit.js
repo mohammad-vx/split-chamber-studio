@@ -184,9 +184,10 @@ export class OrbitSim {
     // reflecting relative to the blade would turn balls into co-rotating riders that are almost never cut again.
     const c = this.cfg, { cx, cy } = c.arena;
     const dx = this.x[i] - cx, dy = this.y[i] - cy, d = Math.sqrt(dx * dx + dy * dy) || 1;
-    const kick = (rand(this.seed, this.id[i], step, P_BOUNCE) - 0.5) * 3 * c.radialKick;
-    this.vx[i] = this.vx[i] * 0.92 + dx / d * kick;
-    this.vy[i] = this.vy[i] * 0.92 + dy / d * kick;
+    // outward-biased kick and no speed loss: otherwise orbits decay and the swarm clumps around the hub
+    const kick = (rand(this.seed, this.id[i], step, P_BOUNCE) - 0.3) * 2.5 * c.radialKick;
+    this.vx[i] += dx / d * kick;
+    this.vy[i] += dy / d * kick;
     this.immune[i] = Math.max(this.immune[i], 6);
   }
 

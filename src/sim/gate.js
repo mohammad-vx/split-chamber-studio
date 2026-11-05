@@ -68,4 +68,5 @@ export function compareGate(base, run, rawBase) {
 export const GOLDENS = [
   { key: 'split-chamber@2', seeds: [1, 7, 1234], rawPortable: false },
   { key: 'orbit-crusher@1', seeds: [1, 7, 1234], rawPortable: true },
+  { key: 'rotary-sweeper@1', seeds: [1, 7, 1234], rawPortable: true },
 ];

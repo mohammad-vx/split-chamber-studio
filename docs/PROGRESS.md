@@ -42,3 +42,24 @@ Autonomous implementation of docs/ARCHITECTURE.md (owner approved, owner away). 
   "bounces" turned balls into riders that were never cut (now always counter-rotating, bounce is radial);
   first-cut hook guaranteed; split-chamber@2 first ball starts slow so the first press catches it.
   Validation: 0/60 orbit seeds and 0/40 split@2 seeds fail the run checks (hook limit 3.0 s).
+- Finding: the planned "video bitrate ≥ 60 % of requested" check (review B2) rejected healthy masters — VBR
+  encoders produce 10–20 Mbps of 50 on simple scenes at SSIM 0.99, forcing a slow x264 fallback. The ratio is
+  now informational (default 0, injectable with --min-bitrate-ratio for tests); the SSIM quality gate against
+  rendered truth frames is the real protection (it catches the 80 Mbps → 8.5 Mbps case: SSIM ≈ 0.92 < 0.94).
+- Quality gate now decodes once (all N-1/N/N+1 frames in one ffmpeg pass) instead of 18 decodes.
+- e2e: 14 tests (10 live-play + 4 studio). Studio UI flow (generate → review → keyboard accept → verified
+  master → reproduce identical → reject with tag), quota stop, forced-bitrate fallback to CRF x264, crash
+  recovery: all pass. `--mute` silences live playback (owner request); all headless modes are muted.
+- Orbit: blade "bounce" kept speed loss → swarm collapsed onto the hub (median radius 71 px = hub surface);
+  now outward-biased radial deflection without speed loss → median 184–276 px.
+
+## Step 4 — Packed engine + rotary-sweeper@1
+- `src/engine/packed.js`: equal-radius colliding balls (uniform grid, PBD, 12 substeps × 1 iteration,
+  alternating sweep), gravity after the hook, rotating capsule arms with side memory, static convex wedges,
+  hub, breakable rim. Pinch = closing arm + (opposing wall | pinned neighbour | compressed pile ≥ 18 % overlap),
+  sustained 2 substeps. Newborns separate softly. Despawn by swap-remove; counter shows the peak.
+- `rotary-sweeper@1`: 1–3 arms, 3–6 wedges, gravity 70 % of seeds, ~1,400–1,550 balls (r 8.5), rim-break ending.
+  40/40 seeds pass the run checks (30.4–37.9 s, hook ≤ 1.53 s); ~0.6–1.7 ms/frame; raw state portable
+  Node == Electron. Findings fixed on the way: rim only held balls within 2r (escapes), wedge outer edge could
+  push balls out, 8 substeps left 12 % deep overlaps under gravity (12 substeps: 1.8 %), coverage check used the
+  wrong ball radius for packed scenes (now per-scenario threshold).

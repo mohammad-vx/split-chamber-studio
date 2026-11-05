@@ -117,6 +117,18 @@ export class Pipeline {
     };
     await S().writeStatus(id, status);
     await S().writeFile(id, 'config.json', JSON.stringify(config, null, 1));
+    try {
+      return await this.generateBody(id, sc, config, scenarioKey, seed, caption, t0);
+    } catch (e) {
+      this.current = null;
+      await S().removeMedia(id).catch(() => {});
+      const st = await S().update(id, { status: 'failed', reasons: [this.cancelled ? 'cancelled' : e.message.split('\n')[0]] });
+      this.emit({ type: 'item', status: st });
+      throw e;
+    }
+  }
+
+  async generateBody(id, sc, config, scenarioKey, seed, caption, t0) {
     const reject = async (reasons, stage) => {
       await S().removeMedia(id);
       const st = await S().update(id, { status: 'rejected', reasons, rejectedAt: stage, timings: { totalS: (performance.now() - t0) / 1000 } });
@@ -179,7 +191,7 @@ export class Pipeline {
   async loadRun(id) {
     const st = await S().get(id);
     if (!st) throw new Error(`Unknown video ${id}`);
-    const config = JSON.parse(await (await fetch(`lib://library/videos/${id}/config.json`)).text());
+    const config = await S().readJson(id, 'config.json');
     return { st, config };
   }
 
@@ -192,7 +204,7 @@ export class Pipeline {
     try {
       this.stage(id, 'simulate');
       const summary = await runHeadlessInWorker(config);
-      const stored = await (await fetch(`lib://library/videos/${id}/metrics.json`)).json();
+      const stored = await S().readJson(id, 'metrics.json');
       const sameRun = stored.hashes === b64(summary.hashes);
       if (!sameRun) throw new Error('Reproduction check failed: the simulation no longer produces the same frames as when this video was generated.');
       await this.quotaCheck(summary.durationS * MASTER.bitrateMbps / 8 * 1e6 * 1.15, 'the master');
@@ -251,14 +263,14 @@ export class Pipeline {
   async reproduce(id) {
     const { st, config } = await this.loadRun(id);
     const summary = await runHeadlessInWorker(config);
-    const stored = await (await fetch(`lib://library/videos/${id}/metrics.json`)).json();
+    const stored = await S().readJson(id, 'metrics.json');
     const identical = stored.hashes === b64(summary.hashes);
     let status = st;
     if (identical && st.status === 'accepted' && !(st.masters && st.masters.default && await this.exists(id, st.masters.default.file))) status = await this.accept(id);
     return { identical, frames: summary.frameCount, status };
   }
 
-  async exists(id, file) { try { const r = await fetch(`lib://library/videos/${id}/${file}`, { method: 'HEAD' }); return r.ok; } catch { return false; } }
+  async exists(id, file) { return S().exists(id, file); }
 
   async variation(id, captions) {
     const st = await S().get(id);

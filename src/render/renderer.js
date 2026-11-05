@@ -29,14 +29,16 @@ export class Renderer {
    * 1 for later versions (pistons drawn at (f+1)/FPS, matching the simulated state of frame f).
    */
   constructor(ctx, scale = 1, opts = {}) {
-    const { gpu = true, partTimeOffsetFrames = 0, housings = true } = opts;
+    const { gpu = true, partTimeOffsetFrames = 0, housings = true, rim = true } = opts;
     this.opts = opts;
     this.ctx = ctx;
     this.scale = scale;
     this.partTimeOffsetFrames = partTimeOffsetFrames;
     this.housings = housings;
+    this.rim = rim;
+    this.ballR = opts.ballR || BALL_R;
     this.cache = new Map();
-    this.gl = gpu ? BallLayerGL.create(scale) : null;
+    this.gl = gpu ? BallLayerGL.create(scale, opts.ballR ? { ballR: opts.ballR } : undefined) : null;
     this.build();
   }
 
@@ -51,7 +53,7 @@ export class Renderer {
     this.bg = this.buildBackground(s);
     this.overlay = this.buildOverlay(s);
     // ball sprites: normal + flash variant per colour
-    const S = (BALL_R * 2 + 10);
+    const S = (this.ballR * 2 + 10);
     this.ballSize = S;
     this.balls = COLORS.map((c) => this.buildBall(c, s, S, 0));
     this.flash = COLORS.map((c) => this.buildBall(c, s, S, 1));
@@ -87,10 +89,12 @@ export class Renderer {
     gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.35)');
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.arc(cx, cy, r - 26, 0, Math.PI * 2, true); g.fill();
     // rim
+    if (this.rim) {
     g.lineWidth = 4; g.strokeStyle = 'rgba(214,222,234,0.92)';
     g.beginPath(); g.arc(cx, cy, r + 2, 0, Math.PI * 2); g.stroke();
     g.lineWidth = 1.5; g.strokeStyle = 'rgba(255,255,255,0.35)';
     g.beginPath(); g.arc(cx, cy, r - 2, Math.PI * 1.05, Math.PI * 1.65); g.stroke();
+    }
     // piston housings
     for (let k = 0; k < (this.housings ? 4 : 0); k++) {
       g.save(); g.translate(cx, cy); g.rotate(k * Math.PI / 2);
@@ -103,7 +107,7 @@ export class Renderer {
   buildBall(c, s, S, flash) {
     const cv = mkCanvas(S * s, S * s), g = cv.getContext('2d');
     g.scale(s, s);
-    const m = S / 2, r = BALL_R;
+    const m = S / 2, r = this.ballR;
     // faint glow
     let gr = g.createRadialGradient(m, m, r * 0.6, m, m, m);
     gr.addColorStop(0, rgb(c, flash ? 0.55 : 0.28)); gr.addColorStop(1, rgb(c, 0));

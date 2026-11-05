@@ -1,8 +1,9 @@
 // Scenario registry. Keys are "id@version"; a version is frozen once any of its videos is accepted.
 import { splitChamberV1, splitChamberV2 } from './split-chamber.js';
 import { orbitCrusherV1 } from './orbit-crusher.js';
+import { rotarySweeperV1 } from './rotary-sweeper.js';
 
-const ALL = [splitChamberV1, splitChamberV2, orbitCrusherV1];
+const ALL = [splitChamberV1, splitChamberV2, orbitCrusherV1, rotarySweeperV1];
 export const SCENARIOS = Object.fromEntries(ALL.map((s) => [s.key, s]));
 export const DEFAULT_SCENARIO = 'split-chamber@2';
 

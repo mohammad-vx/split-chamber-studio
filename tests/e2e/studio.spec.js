@@ -1,0 +1,131 @@
+// Studio pipeline tests: UI generate → review → accept (verified master) → reproduce → reject,
+// plus failure injection (quota, ignored bitrate) and crash recovery.
+const { test, expect, _electron: electron } = require('@playwright/test');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { spawnSync, execFileSync } = require('node:child_process');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const ELECTRON = path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
+const FFPROBE = require('ffprobe-static').path;
+const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `sc-${name}-`));
+const statuses = (lib) => (fs.existsSync(path.join(lib, 'videos')) ? fs.readdirSync(path.join(lib, 'videos')) : [])
+  .map((id) => { try { return JSON.parse(fs.readFileSync(path.join(lib, 'videos', id, 'status.json'), 'utf8')); } catch { return null; } }).filter(Boolean);
+
+function cli(lib, extra) {
+  const r = spawnSync(ELECTRON, ['.', '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`, ...extra], { cwd: ROOT, encoding: 'utf8', timeout: 20 * 60 * 1000 });
+  const line = (r.stdout || '').split('\n').find((l) => l.startsWith('STUDIO_RESULT '));
+  return { code: r.status, result: line ? JSON.parse(line.slice('STUDIO_RESULT '.length)) : null, out: r.stdout };
+}
+
+test.describe.configure({ mode: 'serial' });
+
+test('UI: generate, review, accept with verified master, reproduce, reject', async () => {
+  const lib = tmp('ui');
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.waitForSelector('#studio:not(.hidden)');
+
+  await page.click('#st-generate');
+  await page.selectOption('#st-pattern', 'split-chamber@2');
+  await page.fill('#st-count', '2');
+  await page.selectOption('#st-captions', 'en');
+  await page.click('#st-start');
+  await expect(page.locator('#st-job')).toBeHidden({ timeout: 10 * 60 * 1000 });
+  const after = statuses(lib);
+  expect(after.length).toBe(2);
+  const cands = after.filter((s) => s.status === 'candidate');
+  expect(cands.length).toBeGreaterThanOrEqual(1);
+  await expect(page.locator('#st-tab-review b')).toHaveText(String(cands.length));
+
+  // accept the selected (highest score) candidate with the keyboard
+  await page.locator('#st-grid .card').first().click();
+  await page.keyboard.press('a');
+  await expect(page.locator('#st-tab-accepted b')).toHaveText('1', { timeout: 10 * 60 * 1000 });
+  const acc = statuses(lib).find((s) => s.status === 'accepted');
+  const master = path.join(lib, 'videos', acc.id, acc.masters.default.file);
+  const probe = JSON.parse(execFileSync(FFPROBE, ['-v', 'error', '-count_frames', '-show_entries', 'stream=codec_type,width,height,avg_frame_rate,nb_read_frames', '-of', 'json', master]));
+  const v = probe.streams.find((x) => x.codec_type === 'video');
+  expect([v.width, v.height, v.avg_frame_rate]).toEqual([1080, 1920, '60/1']);
+  expect(Number(v.nb_read_frames)).toBe(acc.frameCount);
+  expect(probe.streams.some((x) => x.codec_type === 'audio')).toBe(true);
+  expect(acc.masters.default.quality.accuracy).toMatch(/^(\d+)\/\1$/);
+  expect(fs.existsSync(path.join(lib, 'videos', acc.id, '_truth'))).toBe(false);
+
+  // reproduce: identical frames
+  await page.click('#st-tab-accepted');
+  await page.locator('#st-grid .card').first().click();
+  await page.click('#st-actions button:has-text("Reproduce")');
+  await expect(page.locator('#toast')).toContainText('Identical', { timeout: 5 * 60 * 1000 });
+
+  // reject the remaining candidate (if any) with a reason tag
+  if (cands.length > 1) {
+    await page.click('#st-tab-review');
+    await page.locator('#st-grid .card').first().click();
+    await page.click('#st-actions .tags span:has-text("boring")');
+    await page.keyboard.press('r');
+    await expect(page.locator('#st-tab-rejected b')).toHaveText(String(after.length - cands.length + 1), { timeout: 60000 });
+    const rej = statuses(lib).find((s) => s.status === 'rejected' && s.rejectedAt === 'review');
+    expect(rej.reasons).toContain('boring');
+    expect(fs.readdirSync(path.join(lib, 'videos', rej.id)).sort()).toEqual(['config.json', 'metrics.json', 'status.json']);
+    expect(fs.readFileSync(path.join(lib, 'rejected.jsonl'), 'utf8')).toContain(rej.id);
+  }
+  expect(errors).toEqual([]);
+  await app.close();
+});
+
+test('CLI: tiny quota stops the batch with a clear message and no partial files', () => {
+  const lib = tmp('quota');
+  const r = cli(lib, ['--generate=2', '--pattern=split-chamber@2', '--seeds=11,12', '--quota-mb=1']);
+  expect(r.result).not.toBeNull();
+  expect(r.result.results[0].error).toMatch(/quota/i);
+  for (const s of statuses(lib)) expect(s.status).not.toBe('generating');
+  const leftovers = [];
+  for (const id of fs.readdirSync(path.join(lib, 'videos'))) for (const f of fs.readdirSync(path.join(lib, 'videos', id))) if (/part|tmp/.test(f)) leftovers.push(f);
+  expect(leftovers).toEqual([]);
+  expect(fs.existsSync(path.join(lib, 'studio.lock'))).toBe(false);
+});
+
+test('CLI: encoders that miss a forced bitrate floor are rejected; constant-quality x264 takes over', () => {
+  const lib = tmp('bitrate');
+  const r = cli(lib, ['--generate=1', '--pattern=split-chamber@2', '--seeds=21', '--accept-all', '--min-bitrate-ratio=50']);
+  expect(r.result).not.toBeNull();
+  const st = statuses(lib)[0];
+  // every rate-controlled engine fails the (deliberately impossible) floor and is recorded …
+  const rateControlled = st.attempts.filter((a) => a.engine !== 'ff-x264');
+  expect(rateControlled.length).toBeGreaterThan(0);
+  for (const a of rateControlled) expect(a.error || '').toMatch(/bitrate/i);
+  // … and the CRF x264 fallback (no bitrate target) still has to pass the SSIM quality gate
+  expect(st.status).toBe('accepted');
+  expect(st.masters.default.engine).toMatch(/x264/);
+  const [ok, of] = st.masters.default.quality.accuracy.split('/').map(Number);
+  expect(of).toBeGreaterThan(0);
+  expect(ok).toBe(of);
+});
+
+test('Recovery: interrupted work and a stale lock are cleaned up on start', async () => {
+  const lib = tmp('recover');
+  const d = path.join(lib, 'videos', 'deadbeef0001');
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, 'status.json'), JSON.stringify({ id: 'deadbeef0001', status: 'generating', scenario: 'split-chamber@2', seed: 5, createdAt: new Date().toISOString() }));
+  fs.writeFileSync(path.join(d, 'preview.mp4.part.mp4'), 'partial');
+  fs.writeFileSync(path.join(d, 'status.json.123.tmp'), 'half-written');
+  fs.writeFileSync(path.join(lib, 'studio.lock'), JSON.stringify({ pid: 999999, owner: 'crashed' }));
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  await page.waitForSelector('#studio:not(.hidden)');
+  await page.click('#st-tab-rejected');
+  await expect(page.locator('#st-grid .card')).toHaveCount(1);
+  const st = statuses(lib)[0];
+  expect(st.status).toBe('failed');
+  expect(st.reasons).toContain('interrupted');
+  expect(fs.readdirSync(d).sort()).toEqual(['status.json']);
+  // the stale lock (dead pid) does not block a new batch
+  const ok = await page.evaluate(async () => { await window.host.studio.lock('test'); await window.host.studio.unlock(); return true; });
+  expect(ok).toBe(true);
+  await app.close();
+});

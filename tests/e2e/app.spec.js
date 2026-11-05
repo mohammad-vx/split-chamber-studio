@@ -26,10 +26,12 @@ const leftovers = () => fs.readdirSync(OUT).filter((f) => /\.part|\.tmp/.test(f)
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
-  app = await electron.launch({ args: [ROOT, `--out-dir=${OUT}`], cwd: ROOT });
+  app = await electron.launch({ args: [ROOT, '--mute', `--out-dir=${OUT}`, `--library=${path.join(OUT, 'library')}`], cwd: ROOT });
   page = await app.firstWindow();
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   page.on('pageerror', (e) => consoleErrors.push(String(e)));
+  await page.waitForSelector('#studio:not(.hidden)');
+  await page.click('#st-live');            // the app opens on the Studio home; live play is one click away
   await page.waitForSelector('#menu:not(.hidden)');
 });
 
