@@ -1,0 +1,70 @@
+{
+  "name": "split-chamber",
+  "productName": "Split Chamber",
+  "version": "1.0.0",
+  "description": "Deterministic fission-chamber physics simulation with frame-perfect 1080x1920 60 fps video export.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/unit/sim.test.mjs",
+    "test:e2e": "playwright test",
+    "bench": "electron . --bench",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win dir"
+  },
+  "build": {
+    "appId": "local.splitchamber.app",
+    "productName": "Split Chamber",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "node_modules/mediabunny/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/bin/win32/x64/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "SplitChamber-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "SplitChamber-${version}-setup.exe"
+    }
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "mediabunny": "^1.65.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  }
+}
