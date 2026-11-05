@@ -1,41 +1,35 @@
-// Simulation baseline: capture or verify bit-exact frame hashes for a fixed set of seeds.
-//   node tools/baseline.mjs capture baseline/v1/sim.json
-//   node tools/baseline.mjs verify  baseline/v1/sim.json     (exit 1 + first differing frame on mismatch)
+// Simulation baseline gate.
+//   node tools/baseline.mjs capture baseline/v1/sim.json         canonical frame hashes (step 0 format)
+//   node tools/baseline.mjs capture-raw baseline/v1/sim-raw.json raw state + RNG hashes
+//   node tools/baseline.mjs verify baseline/v1/sim.json [baseline/v1/sim-raw.json]
+// Exit code 1 on any mismatch, with the first differing frame.
 import fs from 'node:fs';
-import { Simulation } from '../src/sim/sim.js';
-import { encodeFrame, hashFrames } from '../src/sim/session.js';
+import { GATE_SEEDS, runGateSeed, compareGate } from '../src/sim/gate.js';
+import { createLegacySim } from '../src/scenarios/split-chamber-v1.js';
 
-const SEEDS = [1, 7, 1234, 4242, 99999];
-const [mode, file] = process.argv.slice(2);
-if (!['capture', 'verify'].includes(mode) || !file) {
-  console.error('usage: node tools/baseline.mjs capture|verify <file.json>');
-  process.exit(2);
-}
-
-function run(seed) {
-  const sim = new Simulation(seed);
-  const frames = [];
-  while (!sim.done) { sim.step(); frames.push(encodeFrame(sim)); }
-  return {
-    seed, frames: frames.length, capFrame: sim.capFrame, outroFrame: sim.outroFrame,
-    hash: hashFrames(frames),
-    frameHashes: frames.map((f) => hashFrames([f])),
-  };
-}
+const [mode, file, rawFile] = process.argv.slice(2);
+const run = (seed) => runGateSeed(createLegacySim, seed);
 
 if (mode === 'capture') {
-  const out = { createdAt: new Date().toISOString(), node: process.version, seeds: SEEDS.map(run) };
-  fs.writeFileSync(file, JSON.stringify(out, null, 1));
-  for (const s of out.seeds) console.log(`seed ${s.seed}: ${s.frames} frames, cap ${s.capFrame}, hash ${s.hash}`);
-} else {
+  const seeds = GATE_SEEDS.map(run).map(({ raw, rng, ...rest }) => rest);
+  fs.writeFileSync(file, JSON.stringify({ createdAt: new Date().toISOString(), node: process.version, seeds }, null, 1));
+  for (const s of seeds) console.log(`seed ${s.seed}: ${s.frames} frames, cap ${s.capFrame}, hash ${s.hash}`);
+} else if (mode === 'capture-raw') {
+  const seeds = GATE_SEEDS.map(run).map(({ seed, frames, raw, rng }) => ({ seed, frames, raw, rng }));
+  fs.writeFileSync(file, JSON.stringify({ createdAt: new Date().toISOString(), node: process.version, seeds }));
+  for (const s of seeds) console.log(`seed ${s.seed}: raw ${s.raw[s.raw.length - 1]} rng ${s.rng[s.rng.length - 1]}`);
+} else if (mode === 'verify') {
   const base = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const rawBase = rawFile ? JSON.parse(fs.readFileSync(rawFile, 'utf8')) : null;
   let ok = true;
   for (const b of base.seeds) {
     const r = run(b.seed);
-    if (r.hash === b.hash && r.frames === b.frames) { console.log(`seed ${b.seed}: OK ${r.hash}`); continue; }
-    ok = false;
-    const i = b.frameHashes.findIndex((h, k) => h !== r.frameHashes[k]);
-    console.log(`seed ${b.seed}: MISMATCH (baseline ${b.hash}, now ${r.hash}; frames ${b.frames} vs ${r.frames}; first differing frame ${i})`);
+    const problem = compareGate(b, r, rawBase && rawBase.seeds.find((s) => s.seed === b.seed));
+    if (problem) { ok = false; console.log(`seed ${b.seed}: MISMATCH — ${problem}`); }
+    else console.log(`seed ${b.seed}: OK ${r.hash}${rawBase ? ' (+raw +rng)' : ''}`);
   }
   process.exit(ok ? 0 : 1);
+} else {
+  console.error('usage: node tools/baseline.mjs capture|capture-raw|verify <file> [rawFile]');
+  process.exit(2);
 }
