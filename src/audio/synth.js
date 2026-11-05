@@ -1,7 +1,7 @@
 // Procedural sound effects driven by session frame data. The same code schedules sounds on a live
 // AudioContext (Play/Replay) and on an OfflineAudioContext (Export), so the exported soundtrack is
 // sample-accurate to the video frames.
-import { FPS } from '../sim/config.js';
+import { FPS } from '../core/constants.js';
 import { mulberry32 } from '../sim/sim.js';
 import { FLAG_HIT_H, FLAG_HIT_V, FLAG_CAP, FLAG_OUTRO } from '../sim/sim.js';
 

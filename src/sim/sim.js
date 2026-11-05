@@ -23,7 +23,13 @@ export const FLAG_CAP = 4;      // first frame at 10,000
 export const FLAG_OUTRO = 8;    // first frame of end card
 
 export class Simulation {
-  constructor(seed) {
+  /**
+   * @param seed   uint32
+   * @param params optional overrides for later split-chamber versions; defaults are the frozen v1 values
+   *               { crush: {floor, boost, knee, squeeze, squeezeN}, finaleHold, outro, safetyCap }
+   */
+  constructor(seed, params = null) {
+    this.p = { crush: CRUSH, finaleHold: FINALE_HOLD, outro: OUTRO, safetyCap: SAFETY_CAP_SECONDS, ...(params || {}) };
     this.seed = seed >>> 0;
     this.rand = mulberry32(this.seed);
     const n = MAX_BALLS;
@@ -69,7 +75,7 @@ export class Simulation {
     const lim = R - r;
     const L = PISTON.halfLen, TH = PISTON.thick;
     const capped = this.capFrame >= 0;
-    const sq = CRUSH.squeeze * Math.min(1, this.count / CRUSH.squeezeN);
+    const sq = this.p.crush.squeeze * Math.min(1, this.count / this.p.crush.squeezeN);
 
     for (let s = 0; s < SUBSTEPS; s++) {
       const t = (f * SUBSTEPS + s + 1) * h;
@@ -119,7 +125,7 @@ export class Simulation {
       for (let k = 0; k < crush.length; k += 2) {
         const i = crush[k];
         if (this.immune[i] !== 0) continue;
-        if (this.capFrame >= 0 || this.rand() > crushChance(this.count)) { this.eject(i, crush[k + 1]); continue; }
+        if (this.capFrame >= 0 || this.rand() > crushChance(this.count, this.p.crush)) { this.eject(i, crush[k + 1]); continue; }
         this.split(i, crush[k + 1], f);
       }
     }
@@ -140,11 +146,11 @@ export class Simulation {
     }
 
     // finale
-    if (this.capFrame < 0 && (this.count >= MAX_BALLS || f >= SAFETY_CAP_SECONDS * FPS)) {
+    if (this.capFrame < 0 && (this.count >= MAX_BALLS || f >= this.p.safetyCap * FPS)) {
       this.capFrame = f;
       this.flags |= FLAG_CAP;
-      this.outroFrame = f + Math.round(FINALE_HOLD * FPS);
-      this.endFrame = this.outroFrame + Math.round(OUTRO * FPS) - 1;
+      this.outroFrame = f + Math.round(this.p.finaleHold * FPS);
+      this.endFrame = this.outroFrame + Math.round(this.p.outro * FPS) - 1;
     }
     if (this.capFrame >= 0) {
       const wave = (f - this.capFrame) / FPS * GOLD_WAVE_SPEED;
@@ -204,7 +210,7 @@ export class Simulation {
  * faces sit at +-d and move with face velocity fv (+ = toward centre for the positive plate).
  */
 /** Probability that a ball caught between closed plates fissions (otherwise it squirts out sideways). */
-export function crushChance(n) { return Math.min(1, CRUSH.floor + CRUSH.boost / (1 + n / CRUSH.knee)); }
+export function crushChance(n, crush = CRUSH) { return Math.min(1, crush.floor + crush.boost / (1 + n / crush.knee)); }
 
 let _p = 0, _v = 0, _hit = false; // outputs of pushPair (avoids per-call allocation)
 

@@ -27,10 +27,12 @@ function rawStateHash(sim) {
 export function runGateSeed(makeSim, seed) {
   const sim = makeSim(seed);
   // Wrap the RNG after construction: all later draws go through sim.rand.
-  const inner = sim.rand;
   let draws = 0, rh = 0x811c9dc5;
-  const f64 = new Float64Array(1), b = new Uint8Array(f64.buffer);
-  sim.rand = () => { const v = inner(); draws++; f64[0] = v; rh = fnvBytes(rh, b); return v; };
+  if (typeof sim.rand === 'function') {          // stream RNG (legacy engine); counter-based engines have none
+    const inner = sim.rand;
+    const f64 = new Float64Array(1), b = new Uint8Array(f64.buffer);
+    sim.rand = () => { const v = inner(); draws++; f64[0] = v; rh = fnvBytes(rh, b); return v; };
+  }
   const frameHashes = [], raw = [], rng = [];
   const frames = [];
   while (!sim.done) {
@@ -61,3 +63,9 @@ export function compareGate(base, run, rawBase) {
   }
   return null;
 }
+
+/** Frozen scenario versions with golden hashes (baseline/goldens/<key>.json). rawPortable: Node == Electron. */
+export const GOLDENS = [
+  { key: 'split-chamber@2', seeds: [1, 7, 1234], rawPortable: false },
+  { key: 'orbit-crusher@1', seeds: [1, 7, 1234], rawPortable: true },
+];

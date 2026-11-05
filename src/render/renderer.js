@@ -15,7 +15,7 @@ const MAX_RINGS_PER_FRAME = 260;
 const INV_Q = 1 / POS_SCALE;
 const FONT = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
-const mkCanvas = (w, h) => new OffscreenCanvas(Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h)));
+export const mkCanvas = (w, h) => new OffscreenCanvas(Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h)));
 const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const mix = (c, d, t) => [c[0] + (d[0] - c[0]) * t, c[1] + (d[1] - c[1]) * t, c[2] + (d[2] - c[2]) * t].map(Math.round);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -23,9 +23,18 @@ const easeOut = (u) => 1 - (1 - u) * (1 - u);
 
 export class Renderer {
   /** @param ctx 2D context whose canvas is (W*scale) x (H*scale) */
-  constructor(ctx, scale = 1, { gpu = true } = {}) {
+  /**
+   * Renderer for the split-chamber family (frozen v1 look).
+   * opts.partTimeOffsetFrames: 0 for split-chamber@1 (v1 draws pistons at f/FPS, issue T1),
+   * 1 for later versions (pistons drawn at (f+1)/FPS, matching the simulated state of frame f).
+   */
+  constructor(ctx, scale = 1, opts = {}) {
+    const { gpu = true, partTimeOffsetFrames = 0, housings = true } = opts;
+    this.opts = opts;
     this.ctx = ctx;
     this.scale = scale;
+    this.partTimeOffsetFrames = partTimeOffsetFrames;
+    this.housings = housings;
     this.cache = new Map();
     this.gl = gpu ? BallLayerGL.create(scale) : null;
     this.build();
@@ -83,7 +92,7 @@ export class Renderer {
     g.lineWidth = 1.5; g.strokeStyle = 'rgba(255,255,255,0.35)';
     g.beginPath(); g.arc(cx, cy, r - 2, Math.PI * 1.05, Math.PI * 1.65); g.stroke();
     // piston housings
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < (this.housings ? 4 : 0); k++) {
       g.save(); g.translate(cx, cy); g.rotate(k * Math.PI / 2);
       drawHousing(g, r);
       g.restore();
@@ -153,7 +162,6 @@ export class Renderer {
   draw(session, f) {
     const g = this.ctx, s = this.scale, meta = session.meta;
     const fr = this.frame(session, f);
-    const t = f / FPS;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     g.drawImage(this.bg, 0, 0);
@@ -168,7 +176,7 @@ export class Renderer {
     this.drawImpacts(session, f); lap('impacts');
     if (meta.capFrame >= 0 && f >= meta.capFrame) this.drawGoldWave(f - meta.capFrame);
     lap('gold');
-    this.drawPistons(t); lap('pistons');
+    this.drawPistons((f + this.partTimeOffsetFrames) / FPS); lap('pistons');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.drawImage(this.overlay, 0, 0);
     g.setTransform(s, 0, 0, s, 0, 0);
@@ -351,7 +359,7 @@ function drawLogo(g, x, y, R) {
   g.restore();
 }
 
-function roundRect(g, x, y, w, h, r) {
+export function roundRect(g, x, y, w, h, r) {
   g.beginPath();
   g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
   g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);

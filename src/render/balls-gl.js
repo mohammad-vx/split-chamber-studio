@@ -1,7 +1,8 @@
 // GPU ball layer: draws all balls of a frame in one instanced point draw call (WebGL2).
 // Profiling showed Canvas 2D drawImage costs ~60 ms for 10,000 balls on an Intel UHD iGPU; this layer
 // uploads the session's packed arrays as-is and lets the GPU shade the spheres.
-import { W, H, BALL_R, PALETTE, GOLD_RGB, MAX_BALLS } from '../sim/config.js';
+import { W, H } from '../core/constants.js';
+import { BALL_R, PALETTE, GOLD_RGB, MAX_BALLS } from '../sim/config.js';
 import { POS_SCALE } from '../sim/session.js';
 
 const VS = `#version 300 es
@@ -40,11 +41,12 @@ void main() {
 }`;
 
 export class BallLayerGL {
-  static create(scale) {
-    try { return new BallLayerGL(scale); } catch (e) { console.warn('WebGL2 ball layer unavailable:', e.message); return null; }
+  static create(scale, opts) {
+    try { return new BallLayerGL(scale, opts); } catch (e) { console.warn('WebGL2 ball layer unavailable:', e.message); return null; }
   }
 
-  constructor(scale) {
+  /** opts: { ballR, palette (array of [r,g,b], last = gold), maxBalls } — defaults are split-chamber@1 */
+  constructor(scale, { ballR = BALL_R, palette = [...PALETTE, GOLD_RGB], maxBalls = MAX_BALLS } = {}) {
     this.canvas = new OffscreenCanvas(Math.round(W * scale), Math.round(H * scale));
     const gl = this.canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error('no webgl2');
@@ -66,17 +68,17 @@ export class BallLayerGL {
       const l = loc(name); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, size, type, false, 0, 0);
       return b;
     };
-    this.bPos = mk('aPos', MAX_BALLS * 4, 2, gl.UNSIGNED_SHORT);
-    this.bCol = mk('aCol', MAX_BALLS, 1, gl.UNSIGNED_BYTE);
-    this.bAge = mk('aAge', MAX_BALLS, 1, gl.UNSIGNED_BYTE);
+    this.bPos = mk('aPos', maxBalls * 4, 2, gl.UNSIGNED_SHORT);
+    this.bCol = mk('aCol', maxBalls, 1, gl.UNSIGNED_BYTE);
+    this.bAge = mk('aAge', maxBalls, 1, gl.UNSIGNED_BYTE);
     const u = (n) => gl.getUniformLocation(prog, n);
     this.uScale = u('uScale');
     gl.uniform2f(u('uView'), W, H);
-    gl.uniform1f(u('uSize'), BALL_R * 2 + 10);
-    gl.uniform1f(u('uR'), BALL_R);
+    gl.uniform1f(u('uSize'), ballR * 2 + 10);
+    gl.uniform1f(u('uR'), ballR);
     gl.uniform1f(u('uQ'), POS_SCALE);
     const pal = new Float32Array(16 * 3);
-    [...PALETTE, GOLD_RGB].forEach((c, i) => { pal[i * 3] = c[0] / 255; pal[i * 3 + 1] = c[1] / 255; pal[i * 3 + 2] = c[2] / 255; });
+    palette.slice(0, 16).forEach((c, i) => { pal[i * 3] = c[0] / 255; pal[i * 3 + 1] = c[1] / 255; pal[i * 3 + 2] = c[2] / 255; });
     gl.uniform3fv(u('uPalette'), pal);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0, 0, 0, 0);

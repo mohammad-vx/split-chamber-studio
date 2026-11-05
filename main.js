@@ -220,7 +220,7 @@ ipcMain.handle('app:info', async () => {
       await fsp.rm(path.join(videos, f), { force: true }).catch(() => {}); cleaned++;
     }
   }
-  return { videos, sessions, cleaned, root: ROOT, version: app.getVersion(), gate: GATE ? { capture: args.includes('--gate-capture'), raw: argVal('gate-raw') || 'sim-raw.json' } : null, bench: BENCH ? { seed: Number(argVal('seed') || 1234), out: argVal('bench-out'), engines: argVal('engines'), bitrate: Number(argVal('bitrate') || 0) || null } : null };
+  return { videos, sessions, cleaned, root: ROOT, version: app.getVersion(), gate: GATE ? { captureGoldens: args.includes('--gate-capture-goldens'), capture: args.includes('--gate-capture'), raw: argVal('gate-raw') || 'sim-raw.json' } : null, bench: BENCH ? { seed: Number(argVal('seed') || 1234), out: argVal('bench-out'), engines: argVal('engines'), scenario: argVal('scenario') || 'split-chamber@1', bitrate: Number(argVal('bitrate') || 0) || null } : null };
 });
 
 ipcMain.handle('ffmpeg:encoders', () => probeEncoders());
@@ -256,6 +256,7 @@ ipcMain.handle('export:begin', async (_e, opts) => {
   if (free !== null && free < need) throw new Error(`Not enough disk space: ${(free / 1e9).toFixed(2)} GB free, about ${(need / 1e9).toFixed(2)} GB needed.`);
   const finalPath = opts.finalPath || await uniquePath(videos, `SplitChamber_${stamp()}_seed${seed}`, '.mp4');
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await fsp.mkdir(path.dirname(finalPath), { recursive: true }); // B1: bench/custom paths may not exist yet
   const job = { id, mode, encoder, frameCount, finalPath, part: `${finalPath}.part.mp4`, wav: `${finalPath}.wav.tmp`, remux: null, written: 0, t0: Date.now() };
   jobs.set(id, job);
   await writeWav(job.wav, audio.channels, audio.sampleRate);

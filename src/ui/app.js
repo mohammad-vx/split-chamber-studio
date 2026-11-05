@@ -1,8 +1,9 @@
 // UI controller: Play (live simulation, no encoding), Replay (from session data), Export (offline).
-import { W, H, FPS } from '../sim/config.js';
-import { Simulation } from '../sim/sim.js';
+import { W, H, FPS } from '../core/constants.js';
 import { encodeFrame, makeMeta, serializeSession, parseSession, hashFrames } from '../sim/session.js';
-import { Renderer } from '../render/renderer.js';
+import { createRenderer } from '../render/factory.js';
+import { getScenario, configOf, DEFAULT_SCENARIO } from '../scenarios/index.js';
+import { createLegacySim } from '../scenarios/split-chamber.js';
 import { Synth, frameEvents, renderSoundtrack } from '../audio/synth.js';
 import { startExport, ENGINES } from '../export/exporter.js';
 
@@ -38,12 +39,20 @@ function layout() {
   const bh = Math.round(bw * H / W);
   if (canvas.width !== bw || canvas.height !== bh) {
     canvas.width = bw; canvas.height = bh;
-    if (renderer) renderer.setScale(bw / W); else renderer = new Renderer(ctx, bw / W);
+    if (renderer) renderer.setScale(bw / W); else renderer = createRenderer(configOf(null), ctx, bw / W);
     redraw();
   }
 }
 let resizeT = 0;
 window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); });
+
+let rendererKey = '';
+function useRendererFor(config) {
+  const key = JSON.stringify(config.render || {});
+  if (renderer && key === rendererKey) return;
+  rendererKey = key;
+  renderer = createRenderer(config, ctx, canvas.width / W);
+}
 
 function redraw() {
   if (state.session && state.shown >= 0 && state.session.frames[state.shown]) renderer.draw(state.session, state.shown);
@@ -83,7 +92,9 @@ function play(seed = newSeed()) {
   stopWorker();
   ensureAudio();
   state.keep = $('opt-keep').checked;
-  state.session = { meta: { seed, capFrame: -1, outroFrame: -1, endFrame: -1, frameCount: -1 }, frames: [], complete: false, saved: false };
+  const config = getScenario(state.scenarioKey || DEFAULT_SCENARIO).generate(seed);
+  useRendererFor(config);
+  state.session = { meta: { seed, capFrame: -1, outroFrame: -1, endFrame: -1, frameCount: -1, scenario: config.scenario, config }, frames: [], complete: false, saved: false };
   const w = new Worker(new URL('../sim/sim.worker.js', import.meta.url), { type: 'module' });
   state.worker = w;
   w.onmessage = (e) => {
@@ -94,7 +105,7 @@ function play(seed = newSeed()) {
     else if (m.type === 'done') { s.meta = m.meta; s.complete = true; host.log('sim done', { seed, frames: m.meta.frameCount, simMs: Math.round(m.simMs) }); }
     else if (m.type === 'error') { toast(`Simulation error: ${m.message}`); host.log('sim error', m.message); }
   };
-  w.postMessage({ type: 'start', seed });
+  w.postMessage({ type: 'start', config });
   startClock('play');
 }
 
@@ -204,6 +215,7 @@ async function openSession(file) {
     const parsed = parseSession(r.buffer);
     stopWorker();
     state.session = { ...parsed, complete: true, saved: true, path: r.path };
+    useRendererFor(configOf(parsed.meta));
     state.keep = true;
     state.shown = parsed.frames.length - 1;
     renderer.draw(state.session, state.shown);
@@ -298,7 +310,7 @@ async function boot() {
   info = await host.info();
   layout();
   // idle picture behind the menu: frame 0 of a fresh simulation
-  const sim = new Simulation(7); sim.step();
+  const sim = createLegacySim(7); sim.step();
   state.session = { meta: makeMeta(sim, 1), frames: [encodeFrame(sim)], complete: true, saved: true };
   state.shown = 0; redraw();
   state.session = null;
@@ -314,9 +326,9 @@ window.__splitChamber = { state, stats, openSession, renderer: () => renderer &&
 // ------------------------------------------------------------ determinism gate (electron . --gate)
 async function runGate(opts) {
   const { compareGate } = await import('../sim/gate.js');
-  const runs = await new Promise((resolve, reject) => {
+  const { runs, goldens } = await new Promise((resolve, reject) => {
     const w = new Worker(new URL('../sim/gate.worker.js', import.meta.url), { type: 'module' });
-    w.onmessage = (e) => { w.terminate(); if (e.data.type === 'done') resolve(e.data.runs); else reject(new Error(e.data.message)); };
+    w.onmessage = (e) => { w.terminate(); if (e.data.type === 'done') resolve(e.data); else reject(new Error(e.data.message)); };
     w.postMessage('go');
   });
   if (opts.capture) {
@@ -324,17 +336,31 @@ async function runGate(opts) {
     await host.benchWrite(`${info.root}/baseline/v1/${opts.raw}`, JSON.stringify({ createdAt: new Date().toISOString(), runtime: navigator.userAgent, seeds }));
     return host.gateDone({ ok: true, summary: `captured ${opts.raw}` });
   }
+  if (opts.captureGoldens) {
+    for (const g of goldens) {
+      await host.benchWrite(`${info.root}/baseline/goldens/${g.key}.json`,
+        JSON.stringify({ key: g.key, createdAt: new Date().toISOString(), runtime: navigator.userAgent, seeds: g.seeds }));
+    }
+    return host.gateDone({ ok: true, summary: `captured goldens ${goldens.map((g) => g.key).join(', ')}` });
+  }
   const [base, raw] = await Promise.all(['sim.json', opts.raw].map((f) => fetch(`../baseline/v1/${f}`).then((r) => r.json())));
   const results = base.seeds.map((b) => {
     const r = runs.find((x) => x.seed === b.seed);
     return { seed: b.seed, hash: r.hash, problem: compareGate(b, r, raw.seeds.find((s) => s.seed === b.seed)) };
   });
+  for (const g of goldens) {
+    const base = await fetch(`../baseline/goldens/${g.key}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    for (const run of g.seeds) {
+      const b = base && base.seeds.find((x) => x.seed === run.seed);
+      results.push({ seed: `${g.key}#${run.seed}`, hash: run.hash, problem: b ? compareGate(b, run, b) : 'no golden file' });
+    }
+  }
   const ok = results.every((r) => !r.problem);
   await host.gateDone({ ok, runtime: navigator.userAgent, results, summary: results.map((r) => `${r.seed}:${r.problem || 'OK'}`).join(' ') });
 }
 
 // ------------------------------------------------------------ benchmark (electron . --bench)
-function simulateInWorker(seed) {
+function simulateInWorker(seed, key = 'split-chamber@1') {
   return new Promise((resolve, reject) => {
     const w = new Worker(new URL('../sim/sim.worker.js', import.meta.url), { type: 'module' });
     const frames = [];
@@ -344,15 +370,15 @@ function simulateInWorker(seed) {
       else if (m.type === 'done') { w.terminate(); resolve({ meta: m.meta, frames, complete: true, simMs: m.simMs }); }
       else if (m.type === 'error') { w.terminate(); reject(new Error(m.message)); }
     };
-    w.postMessage({ type: 'start', seed });
+    w.postMessage({ type: 'start', config: getScenario(key).generate(seed) });
   });
 }
 
-async function bench({ seed, out, engines: engineList, bitrate }) {
+async function bench({ seed, out, engines: engineList, bitrate, scenario }) {
   const outDir = out || `${info.videos}\\bench`;
-  const results = { seed, startedAt: new Date().toISOString(), engines: {} };
-  const a = await simulateInWorker(seed);
-  const b = await simulateInWorker(seed);
+  const results = { seed, scenario, startedAt: new Date().toISOString(), engines: {} };
+  const a = await simulateInWorker(seed, scenario);
+  const b = await simulateInWorker(seed, scenario);
   results.sim = { frames: a.frames.length, capFrame: a.meta.capFrame, simMs: Math.round(a.simMs), hashA: hashFrames(a.frames), hashB: hashFrames(b.frames) };
   results.sim.deterministic = results.sim.hashA === results.sim.hashB;
   // session round-trip through the file format
@@ -362,7 +388,7 @@ async function bench({ seed, out, engines: engineList, bitrate }) {
   results.render = {};
   for (const [sc, gpu] of [[renderer.scale, true], [1, true], [1, false]]) {
     const cv = new OffscreenCanvas(Math.round(W * sc), Math.round(H * sc));
-    const r = new Renderer(cv.getContext('2d', { alpha: false }), sc, { gpu });
+    const r = createRenderer(configOf(a.meta), cv.getContext('2d', { alpha: false }), sc, { gpu });
     const tag = `${r.backend}_${sc.toFixed(3)}`;
     const times = [];
     r.timing = {};

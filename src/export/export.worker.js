@@ -6,8 +6,9 @@ import {
   Output, Mp4OutputFormat, StreamTarget, CanvasSource, AudioSampleSource, AudioSample, Quality,
   canEncodeVideo, canEncodeAudio,
 } from '../../node_modules/mediabunny/dist/bundles/mediabunny.min.mjs';
-import { Renderer } from '../render/renderer.js';
-import { W, H, FPS } from '../sim/config.js';
+import { createRenderer } from '../render/factory.js';
+import { configOf } from '../scenarios/index.js';
+import { W, H, FPS } from '../core/constants.js';
 
 let nextId = 1;
 const pending = new Map();
@@ -43,7 +44,7 @@ async function run(job) {
   const total = session.frames.length;
   const canvas = new OffscreenCanvas(W, H);
   const ctx = canvas.getContext('2d', { alpha: false });
-  const renderer = new Renderer(ctx, 1);
+  const renderer = createRenderer(configOf(job.meta), ctx, 1);
   const started = performance.now();
   const progress = (f) => {
     if (f % 10 === 0 || f === total) {

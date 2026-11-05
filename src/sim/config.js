@@ -1,11 +1,9 @@
-// Shared constants for simulation, rendering, audio and export.
-// Everything is in logical pixels of the 1080x1920 video frame.
+// split-chamber@1 defaults (the frozen v1 engine's constants). Logical pixels of the 1080x1920 frame.
+// Global frame constants live in src/core/constants.js and are re-exported here for the v1 code.
+import { W, H, FPS } from '../core/constants.js';
+export { W, H, FPS };
 
 export const SIM_VERSION = 1;
-
-export const W = 1080;
-export const H = 1920;
-export const FPS = 60;
 export const SUBSTEPS = 4;
 
 export const ARENA = { cx: 540, cy: 1000, r: 460 };

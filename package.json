@@ -7,12 +7,13 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/unit/sim.test.mjs",
+    "test": "node --test tests/unit/sim.test.mjs tests/unit/engine.test.mjs",
     "test:e2e": "playwright test",
     "bench": "electron . --bench",
     "dist": "electron-builder --win",
     "dist:dir": "electron-builder --win dir",
-    "gate": "node tools/baseline.mjs verify baseline/v1/sim.json baseline/v1/sim-raw.node.json && electron . --gate"
+    "gate": "node tools/baseline.mjs verify baseline/v1/sim.json baseline/v1/sim-raw.node.json && node tools/goldens.mjs verify && electron . --gate",
+    "gate:pixels": "node tools/pixelgate.mjs"
   },
   "build": {
     "appId": "local.splitchamber.app",

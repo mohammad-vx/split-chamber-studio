@@ -5,7 +5,7 @@
 // Exit code 1 on any mismatch, with the first differing frame.
 import fs from 'node:fs';
 import { GATE_SEEDS, runGateSeed, compareGate } from '../src/sim/gate.js';
-import { createLegacySim } from '../src/scenarios/split-chamber-v1.js';
+import { createLegacySim } from '../src/scenarios/split-chamber.js';
 
 const [mode, file, rawFile] = process.argv.slice(2);
 const run = (seed) => runGateSeed(createLegacySim, seed);
