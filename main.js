@@ -19,6 +19,8 @@ const FFPROBE = unpacked(require('ffprobe-static').path);
 const args = process.argv.slice(1);
 const argVal = (name) => { const a = args.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; };
 const BENCH = args.includes('--bench');
+const GATE = args.includes('--gate');
+const HEADLESS = BENCH || GATE;
 
 let win = null;
 const jobs = new Map();
@@ -43,7 +45,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 560, height: 980, minWidth: 360, minHeight: 560,
     useContentSize: true, backgroundColor: '#05070b', autoHideMenuBar: true,
-    title: 'Split Chamber', show: !BENCH,
+    title: 'Split Chamber', show: !HEADLESS,
     icon: path.join(ROOT, 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(ROOT, 'preload.js'),
@@ -218,7 +220,7 @@ ipcMain.handle('app:info', async () => {
       await fsp.rm(path.join(videos, f), { force: true }).catch(() => {}); cleaned++;
     }
   }
-  return { videos, sessions, cleaned, version: app.getVersion(), bench: BENCH ? { seed: Number(argVal('seed') || 1234), out: argVal('bench-out'), engines: argVal('engines'), bitrate: Number(argVal('bitrate') || 0) || null } : null };
+  return { videos, sessions, cleaned, root: ROOT, version: app.getVersion(), gate: GATE ? { capture: args.includes('--gate-capture'), raw: argVal('gate-raw') || 'sim-raw.json' } : null, bench: BENCH ? { seed: Number(argVal('seed') || 1234), out: argVal('bench-out'), engines: argVal('engines'), bitrate: Number(argVal('bitrate') || 0) || null } : null };
 });
 
 ipcMain.handle('ffmpeg:encoders', () => probeEncoders());
@@ -348,3 +350,9 @@ ipcMain.handle('bench:write', async (_e, file, text) => {
   await fsp.writeFile(file, text);
 });
 ipcMain.handle('log', (_e, ...parts) => log('renderer', ...parts));
+ipcMain.handle('gate:done', async (_e, result) => {
+  const out = argVal('gate-out');
+  if (out) { await fsp.mkdir(path.dirname(out), { recursive: true }); await fsp.writeFile(out, JSON.stringify(result, null, 1)); }
+  log('gate', result.ok ? 'PASS' : 'FAIL', result.summary);
+  app.exit(result.ok ? 0 : 1);
+});

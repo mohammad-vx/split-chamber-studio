@@ -305,10 +305,33 @@ async function boot() {
   if (info.cleaned) toast(`Removed ${info.cleaned} incomplete export file(s) from a previous run.`);
   requestAnimationFrame(tick);
   if (info.bench) bench(info.bench).catch((e) => { host.log('bench failed', e.message); host.quit(); });
+  if (info.gate) runGate(info.gate).catch((e) => host.gateDone({ ok: false, summary: `gate crashed: ${e.message}` }));
 }
 boot();
 // hooks for automated tests (read-only state + opening a session file without the native dialog)
 window.__splitChamber = { state, stats, openSession, renderer: () => renderer && renderer.backend };
+
+// ------------------------------------------------------------ determinism gate (electron . --gate)
+async function runGate(opts) {
+  const { compareGate } = await import('../sim/gate.js');
+  const runs = await new Promise((resolve, reject) => {
+    const w = new Worker(new URL('../sim/gate.worker.js', import.meta.url), { type: 'module' });
+    w.onmessage = (e) => { w.terminate(); if (e.data.type === 'done') resolve(e.data.runs); else reject(new Error(e.data.message)); };
+    w.postMessage('go');
+  });
+  if (opts.capture) {
+    const seeds = runs.map(({ seed, frames, raw, rng }) => ({ seed, frames, raw, rng }));
+    await host.benchWrite(`${info.root}/baseline/v1/${opts.raw}`, JSON.stringify({ createdAt: new Date().toISOString(), runtime: navigator.userAgent, seeds }));
+    return host.gateDone({ ok: true, summary: `captured ${opts.raw}` });
+  }
+  const [base, raw] = await Promise.all(['sim.json', opts.raw].map((f) => fetch(`../baseline/v1/${f}`).then((r) => r.json())));
+  const results = base.seeds.map((b) => {
+    const r = runs.find((x) => x.seed === b.seed);
+    return { seed: b.seed, hash: r.hash, problem: compareGate(b, r, raw.seeds.find((s) => s.seed === b.seed)) };
+  });
+  const ok = results.every((r) => !r.problem);
+  await host.gateDone({ ok, runtime: navigator.userAgent, results, summary: results.map((r) => `${r.seed}:${r.problem || 'OK'}`).join(' ') });
+}
 
 // ------------------------------------------------------------ benchmark (electron . --bench)
 function simulateInWorker(seed) {

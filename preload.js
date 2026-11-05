@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld('host', {
   fullscreen: call('app:fullscreen'),
   benchWrite: call('bench:write'),
   log: call('log'),
+  gateDone: call('gate:done'),
 });
