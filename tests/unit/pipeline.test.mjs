@@ -104,3 +104,13 @@ test('captions and music plans are deterministic per seed', () => {
   assert.deepEqual(makeMusicPlan(c), makeMusicPlan(c));
   assert.equal(makeMusicPlan(c).bpm, c.tempo.bpm);
 });
+
+test('the app version recorded in every video equals package.json (one number per release)', async () => {
+  const { APP_VERSION } = await import('../../src/pipeline/pipeline.js').catch(() => ({}));
+  const fs = await import('node:fs');
+  const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  const src = fs.readFileSync(new URL('../../src/pipeline/pipeline.js', import.meta.url), 'utf8');
+  const m = /APP_VERSION = '([^']+)'/.exec(src);
+  assert.equal(m && m[1], pkg.version);
+  if (APP_VERSION) assert.equal(APP_VERSION, pkg.version);
+});

@@ -10,7 +10,7 @@ import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.2.1';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];

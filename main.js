@@ -1,6 +1,18 @@
 // Split Chamber — Electron main process.
 // Owns everything that touches disk or child processes: sessions, export files, ffmpeg, ffprobe.
 'use strict';
+// Every child process (ffmpeg, ffprobe, analysis) is registered here, before any module grabs child_process, so that
+// closing the window always stops all of them: nothing keeps running in the background after the app is closed.
+const CHILDREN = new Set();
+{
+  const cp = require('node:child_process'), util = require('node:util');
+  const track = (c) => { if (c && c.pid) { CHILDREN.add(c); c.once('exit', () => CHILDREN.delete(c)); } return c; };
+  const origSpawn = cp.spawn, origExec = cp.execFile, origExecP = cp.execFile[util.promisify.custom];
+  cp.spawn = function (...a) { return track(origSpawn.apply(this, a)); };
+  cp.execFile = function (...a) { return track(origExec.apply(this, a)); };
+  if (origExecP) cp.execFile[util.promisify.custom] = (...a) => { const p = origExecP(...a); track(p.child); return p; };
+}
+function killChildren() { for (const c of CHILDREN) { try { c.kill('SIGKILL'); } catch {} } CHILDREN.clear(); }
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -51,7 +63,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1180, height: 900, minWidth: 720, minHeight: 600,
     useContentSize: true, backgroundColor: '#05070b', autoHideMenuBar: true,
-    title: 'Split Chamber', show: !HEADLESS,
+    title: `Split Chamber Studio ${app.getVersion()}`, show: !HEADLESS,
     icon: path.join(ROOT, 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(ROOT, 'preload.js'),
@@ -95,6 +107,9 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => { for (const id of [...jobs.keys()]) abortJob(id, 'app closing').catch(() => {}); });
+// closing the window ends everything: running exports and analysis are killed, and the process exits
+app.on('will-quit', () => { killChildren(); });
+process.on('exit', () => { killChildren(); });
 process.on('uncaughtException', (err) => log('uncaught', String(err && err.stack || err)));
 
 // ---------------------------------------------------------------- helpers

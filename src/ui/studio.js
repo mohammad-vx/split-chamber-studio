@@ -276,6 +276,7 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
 
   async function init() {
     state.info = await S().info();
+    window.host.info().then((i) => { $('st-version').textContent = `v${i.version}`; }).catch(() => {});
     state.debug = state.info.debug || {};
     state.pipeline = new Pipeline({ onEvent, debug: state.debug });
     const sel = $('st-pattern');
