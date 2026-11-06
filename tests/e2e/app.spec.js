@@ -152,6 +152,33 @@ test('A saved session can be reopened and exported without re-simulating', async
   await page.click('#btn-ex-done');
 });
 
+test('every pattern can be played live', async () => {
+  await page.click('#btn-ex-done').catch(() => {});
+  if (!(await page.isVisible('#menu'))) await page.click('#btn-menu2');
+  const keys = await page.$$eval('#opt-pattern option', (os) => os.map((o) => o.value));
+  expect(keys.length).toBe(7);
+  for (const key of keys) {
+    await page.selectOption('#opt-pattern', key);
+    await page.click('#btn-play');
+    await page.waitForFunction(() => window.__splitChamber.state.shown > 90, null, { timeout: 30000 });
+    const st = await page.evaluate(() => ({ sc: window.__splitChamber.state.session.meta.scenario }));
+    expect(st.sc).toBe(key);
+    await page.keyboard.press('Escape');   // pause
+    await page.click('#btn-menu1');        // back to the live menu
+    await expect(page.locator('#menu')).toBeVisible();
+  }
+  await page.selectOption('#opt-pattern', 'split-chamber@2');
+});
+
+test('Back to Studio returns to the home screen without closing the app', async () => {
+  await page.click('#btn-exit');
+  await expect(page.locator('#studio')).toBeVisible();
+  await expect(page.locator('#menu')).toBeHidden();
+  expect(app.windows().length).toBe(1);
+  await page.click('#st-live');
+  await expect(page.locator('#menu')).toBeVisible();
+});
+
 test('no console errors during the whole run', async () => {
   expect(consoleErrors).toEqual([]);
 });

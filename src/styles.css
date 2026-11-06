@@ -50,6 +50,8 @@ button.ghost { background: none; border-color: transparent; color: var(--muted);
 details { color: var(--muted); }
 details summary { cursor: pointer; padding: 4px 0; }
 details label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.pattern-pick { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--text); }
+.pattern-pick select { flex: 1; max-width: 230px; }
 input[type=text], select { font: inherit; color: var(--text); background: rgba(0,0,0,.35); border: 1px solid var(--line);
   border-radius: 8px; padding: 6px 8px; width: 60%; }
 

@@ -2,7 +2,7 @@
 import { W, H, FPS } from '../core/constants.js';
 import { encodeFrame, makeMeta, serializeSession, parseSession, hashFrames } from '../sim/session.js';
 import { createRenderer } from '../render/factory.js';
-import { getScenario, configOf, DEFAULT_SCENARIO } from '../scenarios/index.js';
+import { getScenario, configOf, DEFAULT_SCENARIO, listedScenarios } from '../scenarios/index.js';
 import { createLegacySim } from '../scenarios/split-chamber.js';
 import { createStudio } from './studio.js';
 import { Pipeline } from '../pipeline/pipeline.js';
@@ -188,7 +188,7 @@ async function finish() {
   const exportable = s.frames.every(Boolean);
   $('end-title').textContent = state.keep || !wasPlay ? 'Session complete' : 'Run complete';
   const capS = s.meta.capFrame >= 0 ? (s.meta.capFrame / FPS).toFixed(1) : '—';
-  $('end-sub').textContent = `10,000 reached in ${capS} s · seed ${s.meta.seed} · ${(s.frames.length / FPS).toFixed(1)} s video`;
+  $('end-sub').textContent = `Peak reached in ${capS} s · seed ${s.meta.seed} · ${(s.frames.length / FPS).toFixed(1)} s video`;
   $('btn-export').classList.toggle('hidden', !exportable);
   $('btn-replay').classList.toggle('hidden', !exportable);
   $('btn-save').classList.add('hidden');
@@ -284,8 +284,29 @@ const eval_fps = (r) => { const [a, b] = String(r).split('/').map(Number); retur
 $('btn-play').onclick = () => play();
 $('btn-open').onclick = openSession;
 $('btn-folder').onclick = () => host.show(null);
-$('btn-exit').onclick = () => host.quit();
-$('btn-studio').onclick = () => { stopWorker(); state.mode = 'menu'; show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); };
+// Exit from live play returns to the Studio home (the app itself closes with the window's X).
+function toStudio() { stopWorker(); state.mode = 'menu'; if (state.audio) state.audio.suspend(); show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); else host.quit(); }
+$('btn-exit').onclick = toStudio;
+const PATTERN_DESC = {
+  'split-chamber': 'One ball. Four presses. Every hit splits it in three — until there are ten thousand.',
+  'orbit-crusher': 'Balls orbit a gravity well while rotating blades cut through the swarm.',
+  'rotary-sweeper': 'A rotating arm sweeps colliding balls against wedges until the glass rim breaks.',
+  jaws: 'V-shaped jaws on a hub open, close and turn — every bite splits what it catches.',
+  rams: 'Two pendulum rams swing a little faster with every strike.',
+  kaleidoscope: 'Triangles contract into a mandala and release.',
+  walls: 'Two walls slide in and squeeze everything between them.',
+};
+{
+  const sel = $('opt-pattern');
+  for (const sc of listedScenarios()) { const o = document.createElement('option'); o.value = sc.key; o.textContent = sc.label; sel.appendChild(o); }
+  sel.value = DEFAULT_SCENARIO;
+  sel.onchange = () => {
+    state.scenarioKey = sel.value;
+    const sc = getScenario(sel.value);
+    $('menu-desc').textContent = PATTERN_DESC[sc.id] || '';
+    document.querySelector('#menu .brand h1').textContent = sc.label;
+  };
+}
 $('btn-resume').onclick = () => pause(false);
 $('btn-restart').onclick = () => play();
 $('btn-menu1').onclick = toMenu;
@@ -299,10 +320,11 @@ $('btn-ex-done').onclick = () => { state.mode = 'ended'; show('end'); };
 
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (!$('studio').classList.contains('hidden')) return; // the Studio home has its own shortcuts
   const playing = state.mode === 'play' || state.mode === 'replay';
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(!state.paused); else if (state.mode === 'menu') play(); }
   else if (e.code === 'KeyR' && (playing || state.mode === 'ended')) play();
-  else if (e.code === 'Escape') { if (playing && !state.paused) pause(true); else if (state.mode !== 'export') toMenu(); }
+  else if (e.code === 'Escape') { if (playing && !state.paused) pause(true); else if (state.mode === 'menu') toStudio(); else if (state.mode !== 'export') toMenu(); }
   else if (e.code === 'KeyF') host.fullscreen();
   else if (e.code === 'KeyE' && state.mode === 'ended' && !$('btn-export').classList.contains('hidden')) doExport();
 });
