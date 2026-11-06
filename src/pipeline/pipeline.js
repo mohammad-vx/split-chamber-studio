@@ -1,7 +1,7 @@
 // Production pipeline (renderer process): Generate → Simulate (headless) → Check → Audio → Preview → Duplicate
 // check → candidate; Accept → verified master. The main process owns all disk writes (library IPC).
 import { FPS } from '../core/constants.js';
-import { getScenario, listedScenarios } from '../scenarios/index.js';
+import { getScenario, randomScenarios } from '../scenarios/index.js';
 import { applyControls } from '../scenarios/controls.js';
 import { metaFromSummary } from '../sim/run.js';
 import { renderSoundtrackFor } from '../audio/synth.js';
@@ -10,7 +10,7 @@ import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '2.5.0';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.0.0';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -71,7 +71,7 @@ export class Pipeline {
         await this.waitForPower(settings);
         if (this.cancelled) break;
         const key = opts.pattern && opts.pattern !== 'random' ? opts.pattern
-          : listedScenarios()[Math.floor(rand(batchSeed, i, 0, 1) * listedScenarios().length)].key;
+          : randomScenarios()[Math.floor(rand(batchSeed, i, 0, 1) * randomScenarios().length)].key;
         const seed = opts.seeds && opts.seeds[i] != null ? opts.seeds[i] : await this.freshSeed(key);
         this.emit({ type: 'batch', index: i, total: opts.count, scenario: key, seed });
         let st;
@@ -118,7 +118,8 @@ export class Pipeline {
     const caption = captionFor(config, captions);
     const t0 = performance.now();
     const status = {
-      id, status: 'generating', scenario: scenarioKey, label: sc.label, seed, caption,
+      id, status: 'generating', scenario: scenarioKey, label: config.invented ? `Invented · ${config.invented.name}` : sc.label, seed, caption,
+      ...(config.invented ? { invented: config.invented } : {}),
       createdAt: new Date().toISOString(), appVersion: APP_VERSION, versions: config.versions, reasons: [],
       ...(batch ? { batch } : {}), ...(config.controls ? { controls: config.controls } : {}),
     };

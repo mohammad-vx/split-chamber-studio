@@ -61,6 +61,7 @@ Press **How it works** in the Studio for the whole flow; select any video to see
 | **Shears Fan** | 3–5 blades on one pin above the arena open and shut over a cradle |
 | **Fan Blades** | Two sector blades swing out against the rim and back together |
 | **Laser Spin** | A laser bar on a planetary carrier spins through balls pulled to the centre |
+| **✦ Invent** | A new machine for every seed, named automatically; the checks keep only the ones that work |
 
 **One rule for every pattern:** all parts are solid, so balls collide with them and never pass through. A ball squeezed between a moving part and a wall or another part **always** splits; nothing is left to chance. The only thing balls pass through is the glowing laser, and it splits whatever it touches. Every video is checked for balls inside solid parts.
 

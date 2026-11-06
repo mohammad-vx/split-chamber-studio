@@ -4,6 +4,13 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.0.0 — 2026-11-06 · Phase 3: Machine Inventor
+- **✦ Invent** in the pattern list: every seed builds a machine nobody wrote by hand (arms with or without elbows
+  around the rim, a roofed hammer over a flat or V anvil, twin sector blades; random mechanism, rhythm, sizes,
+  gravity, optional laser) and names it. The usual checks reject the failures; survivors reach review with an
+  **Invented** badge and their name. An invented machine reproduces exactly from its config.
+- "Random pattern" batches never pick the inventor.
+
 ## 2.5.0 — 2026-11-06 · Phase 2, station 3
 - Three more machines: **Shears Fan** (3–5 blades on one pin above the arena open and shut over a cradle),
   **Fan Blades** (two sector blades swing out against the rim and back together), **Laser Spin** (a laser bar on a

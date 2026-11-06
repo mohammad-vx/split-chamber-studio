@@ -158,3 +158,14 @@ now; (4) after a batch, show clearly how many went to review and how many were r
   along the rim. Laser Spin: pulled to the centre, where the planetary laser passes.
 - Validation, default controls, seeds 300–311: laser-spin 12/12, shears-fan 10/12, fan-blades 10/12.
 - Claw Machine (registered, unlisted): a claw with two fingers pinches too little per grab (≤ 17 % of the target).
+
+## Step 12 — Phase 3 v1: Machine Inventor (2026-11-06)
+
+- `src/scenarios/inventor.js`, pattern `invent@1`: the seed picks a family (sweeper / press / blades), its geometry
+  (always with its pinch surface one ball away), a mechanism (quick return, slam, cam, scissor, swing, turning),
+  rhythm, gravity and an optional laser, and writes `config.invented = { name, family }`. Status label
+  `Invented · <name>`, badge on the card. `randomScenarios()` excludes it from random batches.
+- Validation, default controls, seeds 1–12: 5/12 pass the automatic checks (plan estimate: a quarter to a half).
+  Typical failures: blades that stall after the first split, and elbow sweepers with a laser that fill in < 30 s.
+- Not done yet (PLAN-NEXT §3.2–3.4): geometric pre-check, novelty fingerprint against accepted machines,
+  "save as pattern" / variations, learning from accepts and rejects.

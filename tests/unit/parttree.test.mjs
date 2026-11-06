@@ -92,3 +92,17 @@ test('phase-2 machines: listed, on the contact rule, deterministic, and they spl
   }
 });
 
+test('inventor: every seed is a different, named, reproducible machine, never picked at random', async () => {
+  const { getScenario, listedScenarios, randomScenarios } = await import('../../src/scenarios/index.js');
+  const sc = getScenario('invent@1');
+  assert.ok(listedScenarios().includes(sc) && !randomScenarios().includes(sc));
+  const names = new Set(), families = new Set();
+  for (let s = 1; s <= 12; s++) {
+    const a = sc.generate(s), b = sc.generate(s);
+    assert.deepEqual(a, b, `seed ${s} reproduces`);
+    assert.ok(a.invented.name.length > 10 && a.machine.pinchRule === 'contact');
+    names.add(a.invented.name); families.add(a.invented.family);
+  }
+  assert.ok(names.size >= 10, `only ${names.size} different machines`);
+  assert.equal(families.size, 3);
+});
