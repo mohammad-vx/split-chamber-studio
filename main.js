@@ -68,6 +68,13 @@ function createWindow() {
   win.on('closed', () => { win = null; });
 }
 
+// One interactive window per user: a second launch brings the running window forward instead of starting a second
+// copy that would fight over the same library, settings and browser cache. Headless runs and test runs with their own
+// --library are exempt.
+const SOLO = !HEADLESS && !args.some((a) => a.startsWith('--library='));
+if (SOLO && !app.requestSingleInstanceLock()) { app.exit(0); }
+else if (SOLO) app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });
+
 app.whenReady().then(async () => {
   const { videos, sessions } = dirs();
   await fsp.mkdir(sessions, { recursive: true });
