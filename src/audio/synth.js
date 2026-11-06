@@ -159,7 +159,9 @@ export async function renderSoundtrackFor(config, timeline, frameCount, meta = {
   }
   const buffer = await ctx.startRendering();
   let stats = null;
-  if (music) stats = master([buffer.getChannelData(0), buffer.getChannelData(1)], SAMPLE_RATE);
+  // audio v3: a lower sample ceiling leaves room for inter-sample peaks after AAC (hard strikes reached −0.3 dBTP)
+  const ceilingDb = config && config.versions && config.versions.audio >= 3 ? -2.5 : -1.5;
+  if (music) stats = master([buffer.getChannelData(0), buffer.getChannelData(1)], SAMPLE_RATE, { ceilingDb, passes: ceilingDb < -1.5 ? 3 : 1 });
   return { buffer, stats };
 }
 

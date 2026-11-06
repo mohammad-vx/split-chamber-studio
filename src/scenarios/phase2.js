@@ -16,7 +16,7 @@ import { baseMachine, finalize, wrap } from './machines.js';
 
 const TAU = 6.283185307179586;
 export const ARENA = { cx: 540, cy: 1000, r: 460 };
-const VERSIONS = { engine: 4, renderer: 3, audio: 2, frame: 1, rule: 2 };
+const VERSIONS = { engine: 4, renderer: 3, audio: 3, frame: 1, rule: 2 };
 const r01 = (seed, salt, k) => rand(seed, salt, k, 0);
 const range = (seed, salt, lo, hi, k) => lo + r01(seed, salt, k) * (hi - lo);
 const pick = (seed, salt, arr, k) => arr[Math.floor(r01(seed, salt, k) * arr.length)];
@@ -79,7 +79,7 @@ export const fistArmV1 = machineModule('fist-arm@1', 'Fist Arm', (seed, o) => {
   const sx = ARENA.cx, sy = ARENA.cy;                              // shoulder on the hub at the centre
   const reach = ARENA.r - 1.1 * ballR - fistR;                     // straight arm: the fist passes the rim one ball apart
   const L1 = Math.round(reach * 0.53), L2 = reach - L1;
-  const sweep = T(o, 'sweep', 1.5), bend = T(o, 'bend', 0.7);
+  const sweep = T(o, 'sweep', 1.7), bend = T(o, 'bend', 0.7);
   const armP = pick(seed, S, [4, 4, 6], 2) * beat * T(o, 'slow', 1), punchP = pick(seed, S, [2, 3, 3], 4) * beat * T(o, 'slow', 1);
   const ph = r01(seed, S, 3) * TAU, bs = r01(seed, S, 5) < 0.5 ? 1 : -1, parts = [];
   for (const k of [0, 1]) {                                        // two arms swinging against each other

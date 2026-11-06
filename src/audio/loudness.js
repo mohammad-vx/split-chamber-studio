@@ -41,7 +41,18 @@ export function integratedLoudness(channels, sampleRate) {
 }
 
 /** Normalize to targetLUFS, then limit sample peaks to ceilingDb with look-ahead (in place). */
-export function master(channels, sampleRate, { targetLUFS = -14, ceilingDb = -1.5, lookaheadMs = 5, releaseMs = 80 } = {}) {
+export function master(channels, sampleRate, opts = {}) {
+  const passes = opts.passes || 1;
+  let first = null;
+  for (let k = 0; k < passes; k++) {           // v3: limiting lowers loudness; repeat normalize + limit to win it back
+    const r = masterPass(channels, sampleRate, opts);
+    if (!first) first = r;
+    if (Math.abs(r.afterLUFS - (opts.targetLUFS ?? -14)) < 0.3) break;
+  }
+  return { ...first, afterLUFS: integratedLoudness(channels, sampleRate) };
+}
+
+function masterPass(channels, sampleRate, { targetLUFS = -14, ceilingDb = -1.5, lookaheadMs = 5, releaseMs = 80 } = {}) {
   const before = integratedLoudness(channels, sampleRate);
   const gain = Number.isFinite(before) ? Math.pow(10, (targetLUFS - before) / 20) : 1;
   for (const ch of channels) for (let i = 0; i < ch.length; i++) ch[i] *= gain;

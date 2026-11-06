@@ -4,6 +4,13 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.0.1 — 2026-11-06
+- Sound: hard strikes (Hammer & Bowl) reached −0.3 dBTP after AAC and were rejected. Audio v3 (the new machines and
+  the inventor) limits samples to −2.5 dBFS and wins the loudness back in up to three passes; older audio unchanged.
+  Measured on the two rejected seeds: −1.3 / −1.8 dBTP at −14.6 / −14.4 LUFS.
+- Fist Arm swings wider: 8/12 seeds pass instead of 7/12.
+- These @1 versions were updated before any of their videos was accepted in your library.
+
 ## 3.0.0 — 2026-11-06 · Phase 3: Machine Inventor
 - **✦ Invent** in the pattern list: every seed builds a machine nobody wrote by hand (arms with or without elbows
   around the rim, a roofed hammer over a flat or V anvil, twin sector blades; random mechanism, rhythm, sizes,
