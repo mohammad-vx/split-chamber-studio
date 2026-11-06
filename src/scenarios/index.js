@@ -7,6 +7,7 @@ import { rotarySweeperV2, jawsV2, ramsV2, kaleidoscopeV2, wallsV2 } from './cont
 import { orbitCrusherV2, splitChamberV3, rotarySweeperV3, laserCrossV1, wallsV3, kaleidoscopeV3 } from './phase1.js';
 import { PHASE2, PHASE3 } from './phase2.js';
 import { inventV1 } from './inventor.js';
+import { savedModule, orphanModule } from './saved.js';
 
 // @1 of the packed families stays registered (frozen, reproducible) but is no longer offered: @2 replaces it.
 const ALL = [splitChamberV1, splitChamberV2, orbitCrusherV1, rotarySweeperV1, jawsV1, ramsV1, kaleidoscopeV1, wallsV1,
@@ -19,7 +20,14 @@ for (const s of [splitChamberV2, orbitCrusherV1, rotarySweeperV2, wallsV2, kalei
 export const SCENARIOS = Object.fromEntries(ALL.map((s) => [s.key, s]));
 export const DEFAULT_SCENARIO = 'split-chamber@3';
 
+/** Register the owner's saved machines (from the Studio settings); replaces any previously registered ones. */
+export function registerSaved(list = []) {
+  for (let i = ALL.length - 1; i >= 0; i--) if (ALL[i].saved) { delete SCENARIOS[ALL[i].key]; ALL.splice(i, 1); }
+  for (const p of list) { const m = savedModule(p); ALL.push(m); SCENARIOS[m.key] = m; }
+}
+
 export function getScenario(key) {
+  if (key && key.startsWith('mine-') && !SCENARIOS[key]) return orphanModule(key);   // a deleted saved pattern still replays
   const s = SCENARIOS[key || DEFAULT_SCENARIO];
   if (!s) throw new Error(`Unknown scenario "${key}"`);
   return s;

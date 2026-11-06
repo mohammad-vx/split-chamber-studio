@@ -3,14 +3,15 @@
 import { FPS } from '../core/constants.js';
 import { getScenario, randomScenarios } from '../scenarios/index.js';
 import { applyControls } from '../scenarios/controls.js';
+import { deriveMachine } from '../scenarios/saved.js';
 import { metaFromSummary } from '../sim/run.js';
 import { renderSoundtrackFor } from '../audio/synth.js';
 import { startExport, AUTO_ORDER } from '../export/exporter.js';
 import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
-import { explainRun, explainAudio, explainVideo, explainDuplicate, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
+import { explainRun, explainAudio, explainVideo, explainDuplicate, explainNovelty, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '3.0.1';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.1.0';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -109,9 +110,9 @@ export class Pipeline {
   }
 
   /** One candidate. Returns its status object (candidate | rejected | failed). */
-  async generateOne({ scenarioKey, seed, captions, batch = null, controls = null }) {
+  async generateOne({ scenarioKey, seed, captions, batch = null, controls = null, baseConfig = null }) {
     const sc = getScenario(scenarioKey);
-    const config = applyControls(sc.generate(seed), controls || {});
+    const config = applyControls(baseConfig || sc.generate(seed), controls || {});
     const id = await S().id(config);
     const existing = await S().get(id);
     if (existing && (existing.status === 'candidate' || existing.status === 'accepted')) return { ...existing, duplicateOf: id };
@@ -185,6 +186,8 @@ export class Pipeline {
     const accepted = (await S().list()).filter((x) => x.status === 'accepted' && x.id !== id);
     const dup = findDuplicate(descriptor, accepted);
     checks.push(...explainAudio(audio), ...explainVideo(video), explainDuplicate(dup));
+    const novel = explainNovelty(config, accepted);   // inventions: a new structure, not one already accepted
+    if (novel) checks.push(novel);
     const reasons = checks.filter((c) => !c.ok).map((c) => c.reason);
     if (reasons.length) return reject(reasons, 'analyse');
 
@@ -286,7 +289,12 @@ export class Pipeline {
   async variation(id, captions) {
     const st = await S().get(id);
     const ctl = st.controls ? { ...st.controls, gravity: st.controls.gravity, ending: st.controls.ending === 'cap-gold' ? 'gold' : st.controls.ending } : null;
-    return this.generateOne({ scenarioKey: st.scenario, seed: await this.freshSeed(st.scenario), captions: captions || (st.caption ? st.caption.lang : 'none'), controls: ctl });
+    const seed = await this.freshSeed(st.scenario), lang = captions || (st.caption ? st.caption.lang : 'none');
+    if (st.invented) {   // an invented machine: the same machine with a new rhythm, not a new invention
+      const base = await S().readJson(id, 'config.json');
+      return this.generateOne({ scenarioKey: st.scenario, seed, captions: lang, controls: ctl, baseConfig: deriveMachine(base, seed, st.scenario) });
+    }
+    return this.generateOne({ scenarioKey: st.scenario, seed, captions: lang, controls: ctl });
   }
 }
 

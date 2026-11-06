@@ -4,6 +4,16 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.1.0 — 2026-11-06 · Inventor: pre-check, novelty, saved machines
+- Pre-check: every invented machine is simulated for 12 s first; a machine that stalls or runs away is replaced by
+  another variant of the same seed (up to 6, same family first). Pass rate 42 % → 62 % (24 seeds), with all three
+  families represented.
+- Novelty: an invention with the same structure as one you already accepted is rejected ("A machine you have not
+  accepted yet").
+- ★ Save as pattern: keep an invented machine under a name (stored in the library's `patterns.json`); it appears in
+  the pattern list and every new video of it is a variation (rhythm and swing ±12 %, shapes unchanged).
+- ✦ New variation on an invented video now keeps the machine instead of inventing a new one.
+
 ## 3.0.1 — 2026-11-06
 - Sound: hard strikes (Hammer & Bowl) reached −0.3 dBTP after AAC and were rejected. Audio v3 (the new machines and
   the inventor) limits samples to −2.5 dBFS and wins the loudness back in up to three passes; older audio unchanged.

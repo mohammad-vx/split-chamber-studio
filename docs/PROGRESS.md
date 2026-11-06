@@ -169,3 +169,14 @@ now; (4) after a batch, show clearly how many went to review and how many were r
   Typical failures: blades that stall after the first split, and elbow sweepers with a laser that fill in < 30 s.
 - Not done yet (PLAN-NEXT §3.2–3.4): geometric pre-check, novelty fingerprint against accepted machines,
   "save as pattern" / variations, learning from accepts and rejects.
+
+## Step 13 — fixes and the inventor's pre-check, novelty and saved machines (2026-11-06)
+
+- Audio v3 (`src/audio/synth.js`, `loudness.js`): sample ceiling −2.5 dBFS and up to 3 normalize-and-limit passes;
+  older configs keep −1.5 dBFS and one pass (their audio is unchanged).
+- Inventor pre-check (`precheck` in `src/scenarios/inventor.js`): 12 s of simulation; survivors of the first test
+  had 18 … 13 % of the target at 12 s. Up to 6 attempts per seed (`config.invented.attempt`), the seed's family kept
+  for the first 4. Blade ranges narrowed to the tuned Fan Blades values (wider ones stalled).
+- Novelty: `explainNovelty` compares `family: name` with accepted inventions.
+- Saved machines: `src/scenarios/saved.js` (`deriveMachine`, `savedModule`, `orphanModule`), registered from the
+  library's `patterns.json` (`library:patterns` IPC). A deleted pattern's videos still replay (orphan module).

@@ -106,3 +106,22 @@ test('inventor: every seed is a different, named, reproducible machine, never pi
   assert.ok(names.size >= 10, `only ${names.size} different machines`);
   assert.equal(families.size, 3);
 });
+
+test('saved machines: a variation keeps every shape, only rhythm moves; a deleted pattern still replays', async () => {
+  const { getScenario, registerSaved, listedScenarios } = await import('../../src/scenarios/index.js');
+  const { baseFrom, deriveMachine } = await import('../../src/scenarios/saved.js');
+  const inv = getScenario('invent@1').generate(6, { precheck: false });
+  const base = baseFrom(inv, 'abc123');
+  registerSaved([{ key: 'mine-test@1', label: 'Test machine', base }]);
+  const sc = getScenario('mine-test@1');
+  assert.ok(listedScenarios().includes(sc));
+  const a = sc.generate(11), b = sc.generate(12);
+  assert.deepEqual(a, sc.generate(11));
+  assert.deepEqual(a.machine.parts.map((p) => p.pts || p.u1 || p.r), inv.machine.parts.map((p) => p.pts || p.u1 || p.r), 'shapes unchanged');
+  assert.notDeepEqual(a.machine.parts[0].motion, b.machine.parts[0].motion, 'rhythm varies with the seed');
+  const v = deriveMachine(inv, 99, 'invent@1');
+  assert.equal(v.scenario, 'invent@1'); assert.equal(v.seed, 99);
+  registerSaved([]);
+  assert.ok(!listedScenarios().some((s) => s.key === 'mine-test@1'));
+  assert.equal(typeof getScenario('mine-test@1').createSim, 'function');
+});

@@ -1,6 +1,7 @@
 // Studio home screen (owner decision D9): review queue, accepted library, batch generation, reproduce,
 // new variation, other-language masters. Keyboard: ←/→ select · Enter play · A accept · R reject · Esc close.
-import { listedScenarios } from '../scenarios/index.js';
+import { listedScenarios, registerSaved } from '../scenarios/index.js';
+import { baseFrom, slug } from '../scenarios/saved.js';
 import { Pipeline } from '../pipeline/pipeline.js';
 
 const $ = (id) => document.getElementById(id);
@@ -176,6 +177,21 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     if (it.status === 'accepted' || it.status === 'candidate' || it.status === 'rejected') {
       btn('✦ New variation', () => run('Generating a variation', () => state.pipeline.variation(it.id)));
     }
+    if (it.invented && (it.status === 'accepted' || it.status === 'candidate')) {   // keep this machine as a pattern
+      const row = document.createElement('div'); row.className = 'save-pattern';
+      row.innerHTML = '<input id="st-save-name" maxlength="40" placeholder="Name for this machine"><button id="st-save-btn">★ Save as pattern</button>';
+      box.appendChild(row);
+      $('st-save-name').value = it.invented.name.split(' · ').slice(0, 2).join(' ');
+      $('st-save-btn').onclick = () => run('Saving the machine as a pattern', async () => {
+        const label = $('st-save-name').value.trim() || 'My machine';
+        const list = (await S().patterns()).filter((p) => p.label !== label);
+        let key = `mine-${slug(label)}@1`; for (let n = 2; list.some((p) => p.key === key); n++) key = `mine-${slug(label)}-${n}@1`;
+        list.push({ key, label, base: baseFrom(await S().readJson(it.id, 'config.json'), it.id), savedAt: new Date().toISOString() });
+        await S().patterns(list);
+        registerSaved(list); fillPatternPickers();
+        toast(`Saved "${label}": it is now in the pattern list.`);
+      });
+    }
     box.appendChild(explanation(it));
   }
 
@@ -275,14 +291,21 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     else if ((e.key === 'r' || e.key === 'R') && it && it.status === 'candidate' && !state.busy) doReject(it);
   }
 
+  function fillPatternPickers() {
+    const opts = (list) => list.map((s) => `<option value="${s.key}">${s.saved ? '★ ' : ''}${s.label}</option>`).join('');
+    const sel = $('st-pattern'), keep = sel.value;
+    sel.innerHTML = '<option value="random">Random pattern</option>' + opts(listedScenarios());
+    if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + opts(listedScenarios());
+  }
+
   async function init() {
     state.info = await S().info();
     window.host.info().then((i) => { $('st-version').textContent = `v${i.version}`; }).catch(() => {});
     state.debug = state.info.debug || {};
     state.pipeline = new Pipeline({ onEvent, debug: state.debug });
-    const sel = $('st-pattern');
-    sel.innerHTML = '<option value="random">Random pattern</option>' + listedScenarios().map((s) => `<option value="${s.key}">${s.label}</option>`).join('');
-    $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + listedScenarios().map((s) => `<option value="${s.key}">${s.label}</option>`).join('');
+    registerSaved(await S().patterns());
+    fillPatternPickers();
     for (const id of ['st-filter-pattern', 'st-sort', 'st-filter-batch']) $(id).onchange = () => { state.sel = 0; render(); };
     $('st-search').oninput = () => { state.sel = 0; render(); };
     for (const t of ['review', 'accepted', 'rejected']) $(`st-tab-${t}`).onclick = () => { state.tab = t; state.sel = 0; render(); };

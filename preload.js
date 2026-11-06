@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('host', {
     id: call('library:id'), path: call('library:path'), writeFile: call('library:write-file'),
     readJson: call('library:read-json'), exists: call('library:exists'),
     removeMedia: call('library:remove-media'), remove: call('library:delete'), rejectLog: call('library:reject-log'),
-    seenSeeds: call('library:seen-seeds'), queue: call('library:queue'),
+    seenSeeds: call('library:seen-seeds'), queue: call('library:queue'), patterns: call('library:patterns'),
     audioReport: call('media:audio'), videoReport: call('media:video'), dhash: call('media:dhash'),
     thumb: call('media:thumb'), quality: call('media:quality'),
     powerBlock: call('power:block'), powerState: call('power:state'), cliDone: call('cli:done'),

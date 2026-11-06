@@ -131,6 +131,38 @@ test('UI: batch summary, live view of the running video, and per-video explanati
   await app.close();
 });
 
+test('UI: an invented machine gets its badge and can be saved as a pattern', async () => {
+  const lib = tmp('invent');
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.waitForSelector('#studio:not(.hidden)');
+  await page.click('#st-generate');
+  await page.selectOption('#st-pattern', 'invent@1');
+  await page.fill('#st-count', '1');
+  await page.evaluate(() => { window.__splitChamber.testSeeds = [6]; });
+  await page.click('#st-start');
+  await expect(page.locator('#st-job')).toBeHidden({ timeout: 10 * 60 * 1000 });
+  const st = statuses(lib)[0];
+  expect(st.invented && st.invented.name).toBeTruthy();
+  expect(st.label).toContain('Invented');
+  expect(st.checks.some((c) => c.name === 'A machine you have not accepted yet')).toBe(st.status !== 'rejected' || st.rejectedAt === 'analyse');
+  await page.click(st.status === 'candidate' ? '#st-tab-review' : '#st-tab-rejected');
+  await expect(page.locator('#st-grid .card .badge-invented').first()).toBeVisible();
+  if (st.status === 'candidate') {
+    await page.locator('#st-grid .card').first().click();
+    await page.fill('#st-save-name', 'Test Arm');
+    await page.click('#st-save-btn');
+    await expect(page.locator('#st-pattern option[value="mine-test-arm@1"]')).toHaveCount(1);
+    const saved = JSON.parse(fs.readFileSync(path.join(lib, 'patterns.json'), 'utf8'));
+    expect(saved.map((p) => p.key)).toContain('mine-test-arm@1');
+  }
+  expect(errors).toEqual([]);
+  await app.close();
+});
+
 test('CLI: tiny quota stops the batch with a clear message and no partial files', () => {
   const lib = tmp('quota');
   const r = cli(lib, ['--generate=2', '--pattern=split-chamber@2', '--seeds=11,12', '--quota-mb=1']);

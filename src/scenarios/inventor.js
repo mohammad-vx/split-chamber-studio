@@ -11,9 +11,11 @@ import { rand } from '../engine/rng.js';
 import { dsin, dcos } from '../engine/dmath.js';
 import { baseMachine, finalize, wrap } from './machines.js';
 import { machineModule, bowlPieces, ARENA } from './phase2.js';
+import { MachineSim } from '../engine/machines.js';
+import { FPS } from '../core/constants.js';
 
 const TAU = 6.283185307179586;
-const VERSIONS = { engine: 4, renderer: 3, audio: 2, frame: 1, rule: 2, inventor: 1 };
+const VERSIONS = { engine: 4, renderer: 3, audio: 3, frame: 1, rule: 2, inventor: 1 };
 const RULE = { pinchRule: 'contact', safetyCap: 40, checkSolid: true };
 const MECH_NAMES = { quickReturn: 'quick-return', slam: 'slam', cam: 'cam', scissor: 'scissor', oscillate: 'swing', rotate: 'turning' };
 
@@ -68,9 +70,10 @@ function press(R, ballR, beat) {
 
 /** Two sector blades on the hub. */
 function blades(R, ballR, beat) {
-  const { cx, cy, r } = ARENA, g = 1.1 * ballR, rad = r - 1.1 * ballR - g, w = R.range(0.4, 0.75), n = 8;
-  const down = R.pick([Math.PI / 2, Math.PI / 2, 0, Math.PI]), amp = R.range(0.9, 1.4), kind = R.pick(['scissor', 'quickReturn', 'cam']);
-  const period = R.pick([4, 5, 6]) * beat, parts = [];
+  // ranges kept near the hand-tuned Fan Blades (wider ones stalled after the first split)
+  const { cx, cy, r } = ARENA, g = 1.1 * ballR, rad = r - 1.1 * ballR - g, w = R.range(0.5, 0.72), n = 8;
+  const down = Math.PI / 2, amp = R.range(1.1, 1.35), kind = R.pick(['scissor', 'scissor', 'quickReturn']);
+  const period = R.pick([5, 6, 7]) * beat, parts = [];
   for (const sd of [-1, 1]) {
     const pts = [[0, 0]]; for (let k = 0; k <= n; k++) { const th = -sd * w * k / n; pts.push([rad * Math.cos(th), rad * Math.sin(th)]); }
     const nx = -dsin(down), ny = dcos(down);                         // blades sit side by side across their axis
@@ -85,8 +88,11 @@ const FAMILIES = { sweeper, press, blades };
 
 /** Invent a machine from a seed: { machine parts…, name, family }. Pure and deterministic. */
 export function invent(seed, o = {}) {
-  const R = rng(seed, 0x1a7e), bpm = Math.round(R.range(86, 122)), beat = 60 / bpm, ballR = Math.round(R.range(9, 11) * 2) / 2;
-  const family = o.family || R.pick(['sweeper', 'sweeper', 'press', 'blades']);
+  const R = rng(seed, 0x1a7e + (o.attempt || 0) * 0x101);   // attempt 0 = the original v1 draw
+  const bpm = Math.round(R.range(86, 122)), beat = 60 / bpm, ballR = Math.round(R.range(9, 11) * 2) / 2;
+  const fam = R.pick(['sweeper', 'sweeper', 'press', 'blades']);
+  // the seed's own family for the first attempts (only the details are redrawn), so the mix of families survives
+  const family = o.family || ((o.attempt || 0) < 4 ? rng(seed, 0x1a7e).pick(['sweeper', 'sweeper', 'press', 'blades']) : fam);
   const m = FAMILIES[family](R, ballR, beat);
   if (family !== 'press' && R() < 0.3) {                             // a see-through laser crossing the machine
     const omega = TAU / (R.pick([12, 16, 24]) * beat);
@@ -96,8 +102,22 @@ export function invent(seed, o = {}) {
   return { ...m, bpm, ballR, family };
 }
 
-export const inventV1 = machineModule('invent@1', '✦ Invent', (seed, o) => {
-  const inv = invent(seed, o);
+/**
+ * Quick pre-check (12 s of simulation, well under a second): does the machine start the way the good ones do?
+ * Measured on the first inventions: survivors had 18 … 13 % of the target balls at 12 s; stalls stayed at 3,
+ * runaways had > 15 %. Returns { ok, n12, why }.
+ */
+export function precheck(cfg) {
+  const sim = new MachineSim(cfg), max = cfg.machine.maxBalls;
+  while (sim.frame < 12 * FPS && !sim.done) sim.step();
+  const n = sim.count;
+  if (n < 18) return { ok: false, n12: n, why: 'stalls' };
+  if (n > 0.13 * max) return { ok: false, n12: n, why: 'too fast' };
+  return { ok: true, n12: n };
+}
+
+function build(seed, o, attempt) {
+  const inv = invent(seed, { ...o, attempt });
   const S = 0x1a7f;
   const machine = finalize(baseMachine(seed, S, { ...RULE, parts: inv.parts, hubR: inv.hubR, ballR: inv.ballR, gravityChance: 1,
     freeFraction: inv.freeFraction, start: inv.start, splitInto: 3, beamImmune: 120, ...(o.tune || {}) }));
@@ -107,7 +127,20 @@ export const inventV1 = machineModule('invent@1', '✦ Invent', (seed, o) => {
   cfg.duration = { minS: 30, maxS: 50 };
   cfg.checks = { ...(cfg.checks || {}), climaxFillMin: 0.5, solidMax: 0.035 };
   cfg.versions = { ...VERSIONS };
-  cfg.invented = { name: inv.name, family: inv.family };
+  cfg.invented = { name: inv.name, family: inv.family, attempt };
   return cfg;
+}
+
+export const ATTEMPTS = 6;
+export const inventV1 = machineModule('invent@1', '✦ Invent', (seed, o) => {
+  // try up to ATTEMPTS variants of this seed; keep the first that starts well (deterministic: same seed → same machine)
+  let first = null;
+  for (let k = 0; k < ATTEMPTS; k++) {
+    const cfg = build(seed, o, k), pc = o.precheck === false ? { ok: true } : precheck(cfg);
+    if (!first) first = cfg;
+    if (pc.ok) { cfg.invented.precheck = pc.n12 != null ? `${pc.n12} balls at 12 s` : 'skipped'; return cfg; }
+  }
+  first.invented.precheck = 'no variant passed; kept the first';
+  return first;
 }, { gravity: 'auto' });
 inventV1.random = false;   // never picked by "Random pattern": you ask for an invention

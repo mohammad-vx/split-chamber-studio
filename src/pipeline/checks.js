@@ -96,6 +96,15 @@ export function hamming(a, b) {
 }
 
 /** Closest accepted video by descriptor; duplicate if both distances are under the limits. */
+/** Invented machines: the same machine structure (family + name) as an invented machine you already accepted. */
+export function machineFingerprint(config) { return config && config.invented ? `${config.invented.family}: ${config.invented.name}` : null; }
+export function explainNovelty(config, accepted) {
+  const fp = machineFingerprint(config);
+  if (!fp) return null;
+  const same = accepted.find((a) => a.invented && `${a.invented.family}: ${a.invented.name}` === fp);
+  return row('preview', 'A machine you have not accepted yet', fp, 'no accepted invention with the same structure', !same, same ? `same machine as accepted video ${same.id}` : '');
+}
+
 export function findDuplicate(desc, accepted) {
   let best = null;
   for (const a of accepted) {
