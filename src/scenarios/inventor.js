@@ -11,7 +11,7 @@ import { rand } from '../engine/rng.js';
 import { dsin, dcos } from '../engine/dmath.js';
 import { baseMachine, finalize, wrap } from './machines.js';
 import { machineModule, bowlPieces, ARENA } from './phase2.js';
-import { MachineSim } from '../engine/machines.js';
+import { MachineSim, partPose, partGeometry } from '../engine/machines.js';
 import { FPS } from '../core/constants.js';
 
 const TAU = 6.283185307179586;
@@ -38,8 +38,11 @@ function sweeper(R, ballR, beat) {
       motion: { mech: { kind, period: R.pick([2, 3, 4]) * beat, phase: k * 0.5, rise: 0.45, fall: 0.08, slow: 0.75, to: [0, 0, (k % 2 ? -1 : 1) * bend] } } });
     parts.push({ type: 'circle', parent: parts.length - 1, pivot: [elbow ? L2 : L1, 0], at: [0, 0], r: headR, motion: {} });
   }
-  const sa = (counter ? Math.PI / 2 : base) + 0.35;
-  return { parts, hubR: 36, start: [cx + dcos(sa) * (r - ballR - 6), cy + dsin(sa) * (r - ballR - 6)], gravity: turning ? 'center' : 'on', beatPart: 0,
+  // the first ball waits where the first head will be 0.3 s in (so the very first swing strikes it: hook ≤ 3 s)
+  const head = parts.findIndex((p) => p.type === 'circle');
+  const hc = partGeometry(parts[head], partPose(parts[head], 0.3, parts)).c;
+  const sa = Math.atan2(hc[1] - cy, hc[0] - cx);
+  return { parts, hubR: 36, start: [cx + Math.cos(sa) * (r - ballR - 3), cy + Math.sin(sa) * (r - ballR - 3)], gravity: turning ? 'center' : 'on', beatPart: 0,
     name: `${arms === 1 ? 'one arm' : `${arms} arms`}${elbow ? (arms === 1 ? ' with an elbow' : ' with elbows') : ''} · ${headR > 46 ? 'heavy' : 'light'} heads · ${MECH_NAMES[turning ? 'rotate' : 'oscillate']}${elbow ? ` + ${MECH_NAMES[kind]}` : ''}`, freeFraction: 0.85 };
 }
 
@@ -76,7 +79,7 @@ function blades(R, ballR, beat) {
   const period = R.pick([5, 6, 7]) * beat, parts = [];
   for (const sd of [-1, 1]) {
     const pts = [[0, 0]]; for (let k = 0; k <= n; k++) { const th = -sd * w * k / n; pts.push([rad * Math.cos(th), rad * Math.sin(th)]); }
-    const nx = -dsin(down), ny = dcos(down);                         // blades sit side by side across their axis
+    const nx = dsin(down), ny = -dcos(down);                         // blades side by side across their axis (left blade on the left)
     parts.push({ type: 'poly', pivot: [cx + sd * nx * g / 2, cy + sd * ny * g / 2], angle: down, pts, motion: { mech: { kind, period, slow: 0.7, to: [0, 0, -sd * amp] } } });
   }
   const sa = down + w + 0.25;
@@ -94,7 +97,7 @@ export function invent(seed, o = {}) {
   // the seed's own family for the first attempts (only the details are redrawn), so the mix of families survives
   const family = o.family || ((o.attempt || 0) < 4 ? rng(seed, 0x1a7e).pick(['sweeper', 'sweeper', 'press', 'blades']) : fam);
   const m = FAMILIES[family](R, ballR, beat);
-  if (family !== 'press' && R() < 0.3) {                             // a see-through laser crossing the machine
+  if (family === 'sweeper' && R() < 0.3) {                           // a see-through laser crossing the arms (with blades it pushed balls into the metal)
     const omega = TAU / (R.pick([12, 16, 24]) * beat);
     m.parts.push({ type: 'beam', pivot: [ARENA.cx, ARENA.cy], angle: R() * TAU, u0: 40, u1: ARENA.r - 6, thick: 3, motion: { rotate: { dir: R() < 0.5 ? 1 : -1, omega } } });
     m.name += ' · laser';
@@ -116,6 +119,52 @@ export function precheck(cfg) {
   return { ok: true, n12: n };
 }
 
+/** Balls at 12 s and 24 s, and the frame the finale would start at (if it comes within 24 s). */
+function growth(cfg) {
+  const sim = new MachineSim(cfg);
+  let n12 = 0;
+  while (sim.frame < 24 * FPS && !sim.done && sim.capFrame < 0) { sim.step(); if (sim.frame === 12 * FPS) n12 = sim.count; }
+  return { n12: n12 || sim.count, n24: sim.count, cap: sim.capFrame >= 0 ? sim.capFrame / FPS : -1, max: cfg.machine.maxBalls };
+}
+
+/** When the finale would start, extrapolated from the growth between 12 s and 24 s. */
+function finaleEstimate(g) {
+  if (g.cap > 0) return g.cap;
+  if (g.n24 <= g.n12 || g.n24 < 6) return Infinity;
+  return 24 + 12 * Math.log(g.max / g.n24) / Math.log(g.n24 / g.n12);
+}
+
+const TARGET_S = 33, K_MIN = 0.6, K_MAX = 2.2;   // aim early: growth slows near the end, the estimate runs optimistic
+function scaleRhythm(cfg, k) {
+  for (const p of cfg.machine.parts) for (const m of Object.values(p.motion || {})) {
+    if (!m || typeof m !== 'object') continue;
+    if (m.period) m.period *= k;
+    if (m.omega) m.omega /= k;
+    if (m.w1) m.w1 /= k;
+    if (m.w2) m.w2 /= k;
+  }
+}
+
+/**
+ * Speed calibration (3.2): measure how fast the machine grows and scale its rhythm (0.6–1.6×) so the finale lands
+ * near 33 s — the inventor used to pick the speed at random and the checks then rejected machines that were fine
+ * but too slow or too fast. Two rounds; returns { ok, k, est } and mutates cfg.
+ */
+export function calibrate(cfg) {
+  let k = 1, est = Infinity;
+  for (let round = 0; round < 2; round++) {
+    const g = growth(cfg);
+    if (g.n12 < 4) return { ok: false, k, est: Infinity, why: 'stalls' };
+    est = finaleEstimate(g);
+    if (est >= 28 && est <= 38) return { ok: true, k, est };
+    const step = Math.min(K_MAX / k, Math.max(K_MIN / k, TARGET_S / Math.min(est, 120)));
+    if (Math.abs(step - 1) < 0.02) break;
+    scaleRhythm(cfg, step); k *= step;
+  }
+  const g = growth(cfg); est = finaleEstimate(g);
+  return { ok: est >= 27 && est <= 39, k, est };
+}
+
 function build(seed, o, attempt) {
   const inv = invent(seed, { ...o, attempt });
   const S = 0x1a7f;
@@ -135,12 +184,19 @@ export const ATTEMPTS = 6;
 export const inventV1 = machineModule('invent@1', '✦ Invent', (seed, o) => {
   // try up to ATTEMPTS variants of this seed; keep the first that starts well (deterministic: same seed → same machine)
   let first = null;
+  const avoid = new Set(o.avoid || []);
   for (let k = 0; k < ATTEMPTS; k++) {
-    const cfg = build(seed, o, k), pc = o.precheck === false ? { ok: true } : precheck(cfg);
+    const cfg = build(seed, o, k);
+    if (avoid.has(`${cfg.invented.family}: ${cfg.invented.name}`)) continue;   // a structure you already accepted
     if (!first) first = cfg;
-    if (pc.ok) { cfg.invented.precheck = pc.n12 != null ? `${pc.n12} balls at 12 s` : 'skipped'; return cfg; }
+    if (o.precheck === false) { cfg.invented.precheck = 'skipped'; return cfg; }
+    const c = calibrate(cfg);
+    cfg.render.parts = cfg.machine.parts;
+    if (c.ok) { cfg.invented.precheck = `speed ×${(1 / c.k).toFixed(2)} · finale ≈ ${c.est.toFixed(0)} s`; cfg.invented.speed = +(1 / c.k).toFixed(3); return cfg; }
   }
+  if (!first) first = build(seed, o, 0);
   first.invented.precheck = 'no variant passed; kept the first';
   return first;
 }, { gravity: 'auto' });
-inventV1.random = false;   // never picked by "Random pattern": you ask for an invention
+inventV1.random = false;
+inventV1.heavyGenerate = true;   // calibration simulates: the pipeline generates it in a worker   // never picked by "Random pattern": you ask for an invention

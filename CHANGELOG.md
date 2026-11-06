@@ -4,6 +4,17 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.2.0 — 2026-11-07 · Every video visible, inventor tuned
+- Rejected videos keep a picture (drawn from the simulation, no encode), ▶ Play replays them live from their
+  settings, and ✓ Accept anyway makes the verified master of a rejected video.
+- Inventor speed calibration: each invented machine is simulated for 24 s and its rhythm scaled (0.6–2.2×) so the
+  finale lands near 33 s. Inventor pass rate: 42 % (3.0) → 62 % (3.1) → 92 % (24 seeds); 17/18 with the three
+  families rotated (6/6 press, 6/6 blades, 5/6 arms).
+- Batches of ✦ Invent rotate arms / press / blades; structures you already accepted are skipped up front.
+- Fixes: the blade family had its two hinges swapped (it never pinched); lasers now go with arms only (with
+  blades they pushed balls into the metal); the first ball waits in the first arm's path (hook ≤ 3 s).
+- The inventor builds its machines in a worker (no UI freeze while it calibrates). Wider "Save as pattern" field.
+
 ## 3.1.1 — 2026-11-06
 - Fix: thumbnails and previews could stay blank in the installed app (the library file handler was registered only
   after the startup recovery pass). It is now registered first, and a failing recovery is logged instead of

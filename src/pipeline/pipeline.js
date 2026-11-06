@@ -4,6 +4,7 @@ import { FPS } from '../core/constants.js';
 import { getScenario, randomScenarios } from '../scenarios/index.js';
 import { applyControls } from '../scenarios/controls.js';
 import { deriveMachine } from '../scenarios/saved.js';
+import { snapshotJpeg } from './snapshot.js';
 import { metaFromSummary } from '../sim/run.js';
 import { renderSoundtrackFor } from '../audio/synth.js';
 import { startExport, AUTO_ORDER } from '../export/exporter.js';
@@ -11,7 +12,7 @@ import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, explainNovelty, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '3.1.1';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.2.0';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -20,6 +21,16 @@ const S = () => window.host.studio;
 const b64 = (u32) => { const b = new Uint8Array(u32.buffer, u32.byteOffset, u32.byteLength); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s) => { const bin = atob(s); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new Uint32Array(b.buffer); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Generate a config in a worker (used by scenarios whose generate() simulates, like the inventor). */
+export function generateInWorker(key, seed, opts) {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(new URL('./generate.worker.js', import.meta.url), { type: 'module' });
+    w.onmessage = (e) => { w.terminate(); if (e.data.type === 'done') resolve(e.data.config); else reject(new Error(e.data.message)); };
+    w.onerror = (e) => { w.terminate(); reject(new Error(e.message || 'generate worker crashed')); };
+    w.postMessage({ key, seed, opts });
+  });
+}
 
 export function runHeadlessInWorker(config, onProgress) {
   return new Promise((resolve, reject) => {
@@ -77,7 +88,8 @@ export class Pipeline {
         this.emit({ type: 'batch', index: i, total: opts.count, scenario: key, seed });
         let st;
         try {
-          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i }, controls: opts.controls });
+          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i }, controls: opts.controls,
+            genOpts: key === 'invent@1' ? await this.inventOpts(i) : null });
           if (st.status === 'candidate' && (opts.acceptAll || (opts.autoAcceptScore != null && st.score >= opts.autoAcceptScore))) st = await this.accept(st.id);
         } catch (e) {
           if (this.cancelled) break;
@@ -110,9 +122,16 @@ export class Pipeline {
   }
 
   /** One candidate. Returns its status object (candidate | rejected | failed). */
-  async generateOne({ scenarioKey, seed, captions, batch = null, controls = null, baseConfig = null }) {
+  /** Inventor batches: rotate the three families, and skip structures that were already accepted. */
+  async inventOpts(i) {
+    const avoid = (await S().list()).filter((x) => x.status === 'accepted' && x.invented).map((x) => `${x.invented.family}: ${x.invented.name}`);
+    return { family: ['sweeper', 'press', 'blades'][i % 3], avoid };
+  }
+
+  async generateOne({ scenarioKey, seed, captions, batch = null, controls = null, baseConfig = null, genOpts = null }) {
     const sc = getScenario(scenarioKey);
-    const config = applyControls(baseConfig || sc.generate(seed), controls || {});
+    const base = baseConfig || (sc.heavyGenerate && typeof Worker !== 'undefined' ? await generateInWorker(scenarioKey, seed, genOpts || {}) : sc.generate(seed, genOpts || {}));
+    const config = applyControls(base, controls || {});
     const id = await S().id(config);
     const existing = await S().get(id);
     if (existing && (existing.status === 'candidate' || existing.status === 'accepted')) return { ...existing, duplicateOf: id };
@@ -140,9 +159,17 @@ export class Pipeline {
 
   async generateBody(id, sc, config, scenarioKey, seed, caption, t0) {
     const checks = [];
-    const reject = async (reasons, stage) => {
+    const reject = async (reasons, stage, summary = null) => {
       await S().removeMedia(id);
-      const st = await S().update(id, { status: 'rejected', reasons, rejectedAt: stage, checks, timings: { totalS: (performance.now() - t0) / 1000 } });
+      // every rejected video keeps a picture: drawn from the simulation itself (no preview was made)
+      let thumb = null;
+      if (summary && config.machine) {
+        try {
+          const blob = await snapshotJpeg(config, Math.min(summary.durationS * 0.62, Math.max(1, summary.capFrame / FPS || summary.durationS * 0.62)));
+          if (blob) { await S().writeFile(id, 'thumb.jpg', new Uint8Array(await blob.arrayBuffer())); thumb = 'thumb.jpg'; }
+        } catch (e) { window.host && window.host.log && window.host.log('snapshot failed', String(e)); }
+      }
+      const st = await S().update(id, { status: 'rejected', reasons, rejectedAt: stage, checks, timings: { totalS: (performance.now() - t0) / 1000 }, ...(thumb ? { thumb } : {}) });
       await S().rejectLog({ scenario: scenarioKey, seed, id, reasons, auto: true });
       this.emit({ type: 'item', status: st });
       return st;
@@ -159,7 +186,7 @@ export class Pipeline {
     await S().writeFile(id, 'metrics.json', JSON.stringify(metrics));
     checks.push(...explainRun(config, summary));
     const runReasons = checks.filter((c) => !c.ok).map((c) => c.reason);
-    if (runReasons.length) return reject(runReasons, 'simulate');
+    if (runReasons.length) return reject(runReasons, 'simulate', summary);
 
     // 3. audio
     this.stage(id, 'audio');

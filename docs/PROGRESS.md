@@ -180,3 +180,16 @@ now; (4) after a batch, show clearly how many went to review and how many were r
 - Novelty: `explainNovelty` compares `family: name` with accepted inventions.
 - Saved machines: `src/scenarios/saved.js` (`deriveMachine`, `savedModule`, `orphanModule`), registered from the
   library's `patterns.json` (`library:patterns` IPC). A deleted pattern's videos still replay (orphan module).
+
+## Step 14 — every video visible; inventor calibration (2026-11-07)
+
+- Owner feedback: 12 of 20 invented videos rejected, the rejected ones had no picture, and the accepted ones were
+  mostly presses. Analysis of that batch: 7 too slow (climax < 50 %), 3 too fast (< 30 s), 1 balls in metal
+  (blades + laser), 1 already-accepted structure.
+- `src/pipeline/snapshot.js`: a rejected-at-simulation video gets `thumb.jpg` drawn from the sim. Studio: ▶ Play on a
+  video without a file replays its config live ("▶ REPLAY"); ✓ Accept anyway calls `accept()` (metrics + config
+  are kept for every reject).
+- `calibrate()` in `src/scenarios/inventor.js`: growth at 12/24 s → finale estimate → rhythm scale, two rounds,
+  target 33 s (growth slows near the end, so the estimate runs optimistic). `generateInWorker` runs heavy
+  generators off the UI thread. `inventOpts(i)`: family rotation and the accepted-structure avoid list.
+- Validation (default controls): seeds 1–12 → 11/12, 100–111 → 11/12; family-rotated 500–517 → 17/18.

@@ -11,7 +11,7 @@ const REASONS = ['boring', 'too similar', 'glitch', 'audio', 'other'];
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function createStudio({ onLivePlay, onWatch, toast }) {
+export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
   const state = { tab: 'review', items: [], sel: 0, busy: false, pipeline: null, info: null, reasons: new Set(), debug: {}, current: null, batch: null };
 
   /** The most recent batch: the running one, else the newest batch id found in the library. */
@@ -148,6 +148,9 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     if (!it) return;
     const btn = (label, fn, cls = '') => { const b = document.createElement('button'); b.textContent = label; b.className = cls; b.disabled = state.busy; b.onclick = fn; box.appendChild(b); };
     btn('▶ Play', () => open(it));
+    if (it.status === 'rejected') {                 // see it anyway, and keep it if you like it
+      btn('✓ Accept anyway', () => run(`Making the master of ${it.id}`, () => state.pipeline.accept(it.id)), 'primary');
+    }
     if (it.status === 'candidate') {
       btn('✓ Accept (A)', () => doAccept(it), 'primary');
       btn('✗ Reject (R)', () => doReject(it));
@@ -197,7 +200,10 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
 
   function open(it) {
     const file = it.status === 'accepted' && it.masters && it.masters.default ? it.masters.default.file : it.preview ? it.preview.file : null;
-    if (!file) return;
+    if (!file) {                                    // no video file (rejected before its preview): play it live from its config
+      S().readJson(it.id, 'config.json').then((config) => { if (onPlayConfig) onPlayConfig(config, it); }).catch(() => toast('This video has no saved settings to play.'));
+      return;
+    }
     const v = $('st-video');
     v.src = `lib://library/videos/${it.id}/${file}`;
     const info = [];

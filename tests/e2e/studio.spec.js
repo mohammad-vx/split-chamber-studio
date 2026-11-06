@@ -163,6 +163,36 @@ test('UI: an invented machine gets its badge and can be saved as a pattern', asy
   await app.close();
 });
 
+test('UI: a rejected video keeps a picture, replays live and can be accepted anyway', async () => {
+  const lib = tmp('rejected');
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.waitForSelector('#studio:not(.hidden)');
+  await page.click('#st-generate');
+  await page.selectOption('#st-pattern', 'shears-fan@1');
+  await page.fill('#st-count', '1');
+  await page.evaluate(() => { window.__splitChamber.testSeeds = [210700]; });   // rejected in the simulation stage
+  await page.click('#st-start');
+  await expect(page.locator('#st-job')).toBeHidden({ timeout: 5 * 60 * 1000 });
+  const st = statuses(lib)[0];
+  expect(st.status).toBe('rejected');
+  expect(st.rejectedAt).toBe('simulate');
+  expect(st.thumb).toBe('thumb.jpg');
+  expect(fs.statSync(path.join(lib, 'videos', st.id, 'thumb.jpg')).size).toBeGreaterThan(2000);
+  await page.click('#st-tab-rejected');
+  await page.waitForFunction(() => { const i = document.querySelector('#st-grid .card img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 10000 });
+  await page.locator('#st-grid .card').first().click();
+  await expect(page.locator('#st-actions button', { hasText: 'Accept anyway' })).toBeVisible();
+  await page.locator('#st-actions button', { hasText: 'Play' }).first().click();
+  await expect(page.locator('#hud-live')).toContainText('REPLAY');
+  await page.waitForFunction(() => window.__splitChamber.state.shown > 30, null, { timeout: 30000 });
+  expect(errors).toEqual([]);
+  await app.close();
+});
+
 test('CLI: tiny quota stops the batch with a clear message and no partial files', () => {
   const lib = tmp('quota');
   const r = cli(lib, ['--generate=2', '--pattern=split-chamber@2', '--seeds=11,12', '--quota-mb=1']);

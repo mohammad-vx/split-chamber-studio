@@ -98,7 +98,7 @@ test('inventor: every seed is a different, named, reproducible machine, never pi
   assert.ok(listedScenarios().includes(sc) && !randomScenarios().includes(sc));
   const names = new Set(), families = new Set();
   for (let s = 1; s <= 12; s++) {
-    const a = sc.generate(s), b = sc.generate(s);
+    const a = sc.generate(s, { precheck: false }), b = sc.generate(s, { precheck: false });   // calibration is tested below
     assert.deepEqual(a, b, `seed ${s} reproduces`);
     assert.ok(a.invented.name.length > 10 && a.machine.pinchRule === 'contact');
     names.add(a.invented.name); families.add(a.invented.family);
@@ -124,4 +124,17 @@ test('saved machines: a variation keeps every shape, only rhythm moves; a delete
   registerSaved([]);
   assert.ok(!listedScenarios().some((s) => s.key === 'mine-test@1'));
   assert.equal(typeof getScenario('mine-test@1').createSim, 'function');
+});
+
+test('inventor 3.2: calibrated speed, family on request, accepted structures skipped, laser only on arms', async () => {
+  const { getScenario } = await import('../../src/scenarios/index.js');
+  const sc = getScenario('invent@1');
+  const a = sc.generate(2, { family: 'blades' });
+  assert.equal(a.invented.family, 'blades');
+  assert.match(a.invented.precheck, /speed ×[\d.]+ · finale ≈ \d+ s/);
+  assert.deepEqual(a, sc.generate(2, { family: 'blades' }), 'calibration is deterministic');
+  assert.ok(!a.machine.parts.some((p) => p.type === 'beam'), 'no laser with blades');
+  const fp = `${a.invented.family}: ${a.invented.name}`;
+  const b = sc.generate(2, { family: 'blades', avoid: [fp] });
+  assert.notEqual(`${b.invented.family}: ${b.invented.name}`, fp, 'an accepted structure is not invented again');
 });

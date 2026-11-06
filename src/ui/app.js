@@ -104,7 +104,7 @@ function watchLive(ev, open) {
   state.watch = ev;
   $('studio').classList.add('hidden');
   const b = ev.batch;
-  $('hud-live').textContent = `● LIVE · ${b ? `video ${b.index + 1} of ${b.total} · ` : ''}${ev.label} · seed ${ev.seed}`;
+  $('hud-live').textContent = `${String(ev.id).startsWith('play-') ? '▶ REPLAY' : '● LIVE'} · ${b ? `video ${b.index + 1} of ${b.total} · ` : ''}${ev.label} · seed ${ev.seed}`;
   $('hud-live').classList.remove('hidden');
   playConfig(ev.config, false);
 }
@@ -381,7 +381,8 @@ async function boot() {
   if (!info.bench && !info.gate) {
     const sinfo = await host.studio.info();
     if (sinfo.cli) { runCli(sinfo.cli, sinfo.debug).catch((e) => host.studio.cliDone({ ok: false, error: e.message })); return; }
-    studio = createStudio({ onLivePlay: () => { state.mode = 'menu'; show('menu'); }, onWatch: watchLive, toast });
+    studio = createStudio({ onLivePlay: () => { state.mode = 'menu'; show('menu'); }, onWatch: watchLive, toast,
+      onPlayConfig: (config, it) => watchLive({ id: `play-${it.id}`, config, label: it.label || it.scenario, seed: it.seed, batch: null }, true) });
     show(null);
     await studio.init();
     studio.show();
