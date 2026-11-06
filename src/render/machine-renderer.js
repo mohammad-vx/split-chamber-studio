@@ -24,6 +24,14 @@ export class MachineRenderer extends Renderer {
 
   buildPart(p, s) {
     const pad = 4;
+    if (p.type === 'beam') {                         // laser: a glowing line, clearly not a solid part
+      const len = p.u1 - p.u0, G = 26, T = G * 2;
+      const cv = mkCanvas((len + G * 2) * s, T * s), g = cv.getContext('2d');
+      g.scale(s, s); g.translate(G, G);
+      for (const [w, a] of [[22, 0.08], [12, 0.16], [6, 0.35]]) { g.strokeStyle = `rgba(70,170,255,${a})`; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(len, 0); g.stroke(); }
+      g.strokeStyle = '#dff3ff'; g.lineWidth = Math.max(2, p.thick * 0.8); g.beginPath(); g.moveTo(0, 0); g.lineTo(len, 0); g.stroke();
+      return { cv, pad: G, ox: p.u0, oy: -G + G, w: len, h: 0, beam: true };
+    }
     if (p.type === 'capsule') {
       const len = p.u1 - p.u0, T = p.thick * 2;
       const cv = mkCanvas((len + pad * 2) * s, (T + pad * 2) * s), g = cv.getContext('2d');
@@ -86,7 +94,8 @@ export class MachineRenderer extends Renderer {
         return;
       }
       g.save(); g.translate(pose.x, pose.y); g.rotate(pose.a);
-      g.drawImage(sp.cv, sp.ox - sp.pad, sp.oy - sp.pad, sp.w + sp.pad * 2, sp.h + sp.pad * 2);
+      if (sp.beam) { g.globalCompositeOperation = 'lighter'; g.drawImage(sp.cv, sp.ox - sp.pad, -sp.pad, sp.w + sp.pad * 2, sp.pad * 2); }
+      else g.drawImage(sp.cv, sp.ox - sp.pad, sp.oy - sp.pad, sp.w + sp.pad * 2, sp.h + sp.pad * 2);
       g.restore();
       if (p.type === 'capsule' && Math.abs(p.u0) < 1 && !o.hubR) pivots.add(`${pose.x},${pose.y}`);
     });
@@ -95,7 +104,13 @@ export class MachineRenderer extends Renderer {
     for (const key of pivots) { const [x, y] = key.split(',').map(Number); const b = this.boltSprite; g.drawImage(b.cv, x - b.size / 2, y - b.size / 2, b.size, b.size); }
     // rim + break
     const m = this._session.meta, f = this._f;
-    const brk = o.ending && o.ending.type === 'rim-break' && m.capFrame >= 0 ? m.capFrame + Math.round(o.finaleHold * FPS) : -1;
+    const flood = o.ending && o.ending.type === 'flood';
+    const brk = o.ending && (o.ending.type === 'rim-break' || flood) && m.capFrame >= 0 ? m.capFrame + Math.round(o.finaleHold * FPS) : -1;
+    if (flood) {                                     // the glass dissolves and the balls spill over the whole frame
+      const fade = brk >= 0 && f >= brk ? clamp01(1 - (f - brk) / 20) : 1;
+      if (fade > 0) { g.lineWidth = 4; g.strokeStyle = `rgba(214,222,234,${0.92 * fade})`; g.beginPath(); g.arc(cx, cy, r + 2 + (1 - fade) * 30, 0, Math.PI * 2); g.stroke(); }
+      return;
+    }
     const gapHalf = (o.ending && o.ending.gapHalf) || 0.5;
     const broken = brk >= 0 && f >= brk, open = broken ? clamp01((f - brk) / 6) : 0;
     g.lineWidth = 4; g.strokeStyle = 'rgba(214,222,234,0.92)';

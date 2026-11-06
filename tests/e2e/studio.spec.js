@@ -31,7 +31,7 @@ test('UI: generate, review, accept with verified master, reproduce, reject', asy
   await page.waitForSelector('#studio:not(.hidden)');
 
   await page.click('#st-generate');
-  await page.selectOption('#st-pattern', 'split-chamber@2');
+  await page.selectOption('#st-pattern', 'split-chamber@3');
   await page.fill('#st-count', '2');
   await page.selectOption('#st-captions', 'en');
   await page.click('#st-start');

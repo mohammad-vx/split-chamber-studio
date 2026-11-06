@@ -3,6 +3,7 @@ import { W, H, FPS } from '../core/constants.js';
 import { encodeFrame, makeMeta, serializeSession, parseSession, hashFrames } from '../sim/session.js';
 import { createRenderer } from '../render/factory.js';
 import { getScenario, configOf, DEFAULT_SCENARIO, listedScenarios } from '../scenarios/index.js';
+import { applyControls } from '../scenarios/controls.js';
 import { createLegacySim } from '../scenarios/split-chamber.js';
 import { createStudio } from './studio.js';
 import { Pipeline } from '../pipeline/pipeline.js';
@@ -92,7 +93,7 @@ function newSeed() {
 
 function play(seed = newSeed()) {
   state.watch = null; $('hud-live').classList.add('hidden');
-  playConfig(getScenario(state.scenarioKey || DEFAULT_SCENARIO).generate(seed), $('opt-keep').checked);
+  playConfig(applyControls(getScenario(state.scenarioKey || DEFAULT_SCENARIO).generate(seed), {}), $('opt-keep').checked);
 }
 
 /** Watch the video the factory is making right now: the same config, simulated again here in real time
@@ -313,8 +314,9 @@ $('btn-folder').onclick = () => host.show(null);
 function toStudio() { state.watch = null; $('hud-live').classList.add('hidden'); $('btn-again').classList.remove('hidden'); $('btn-menu2').textContent = 'Main menu'; stopWorker(); state.mode = 'menu'; if (state.audio) state.audio.suspend(); show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); else host.quit(); }
 $('btn-exit').onclick = toStudio;
 const PATTERN_DESC = {
-  'split-chamber': 'One ball. Four presses. Every hit splits it in three — until there are ten thousand.',
-  'orbit-crusher': 'Balls orbit a gravity well while rotating blades cut through the swarm.',
+  'split-chamber': 'One ball. Four solid presses. Every squeeze splits it — until the chamber is full.',
+  'laser-cross': 'A rotating laser splits everything it touches; balls pile up on fixed wedges.',
+  'orbit-crusher': 'Balls are pulled to the centre while two blades turn in opposite directions and cut like scissors.',
   'rotary-sweeper': 'A rotating arm sweeps colliding balls against wedges until the glass rim breaks.',
   jaws: 'V-shaped jaws on a hub open, close and turn — every bite splits what it catches.',
   rams: 'Two pendulum rams swing a little faster with every strike.',

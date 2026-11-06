@@ -48,17 +48,26 @@ Press **How it works** in the Studio for the whole flow; select any video to see
 
 | Pattern | What happens |
 |---|---|
-| **Split Chamber** | Four presses; every crushed ball splits into three, until 10,000 balls and a gold finale |
-| **Orbit Crusher** | Balls orbit a gravity well; rotating blades cut the orbits |
-| **Rotary Sweeper** | Rotating arms sweep colliding balls against wedges; the pile grows until the glass rim breaks |
+| **Split Chamber** | Four solid presses close in pairs; balls are pulled to the centre and every squeezed ball splits |
+| **Orbit Crusher** | Balls are pulled to the centre; two blades turn in opposite directions and cut like scissors |
+| **Rotary Sweeper** | Rotating arms sweep the balls against fixed wedges |
 | **Scissor Jaws** | V-shaped jaws on a hub open, close and turn |
 | **Melodic Rams** | Two pendulum rams with hammer heads; every swing is a little faster |
-| **Kaleidoscope Press** | Triangles contract into a mandala and release |
-| **Press Walls** | Two walls slide in and squeeze everything between them |
+| **Press Walls** | Two walls slide in and squeeze everything between them (they stop one ball apart) |
+| **Laser Cross** | A rotating laser splits everything it touches; the balls pile up on fixed wedges |
 
-In Rotary Sweeper, Scissor Jaws, Melodic Rams, Kaleidoscope Press and Press Walls (version 2), **every ball squeezed between a moving part and a wall or another part splits**: nothing is left to chance. The finale starts when the arena is full or at 40 s.
+**One rule for every pattern:** all parts are solid, so balls collide with them and never pass through. A ball squeezed between a moving part and a wall or another part **always** splits; nothing is left to chance. The only thing balls pass through is the glowing laser, and it splits whatever it touches. Every video is checked for balls inside solid parts.
 
-Videos are **30–50 s** (Split Chamber 30–40 s, Orbit Crusher 30–45 s).
+**Your controls** (Generate panel):
+
+| Control | Options |
+|---|---|
+| Gravity | Auto (each machine has its own) · On · Off (floating) · Toward the centre |
+| Stop at | Full arena · 300 · 500 · 1,000 · 1,500 balls; the finale starts exactly there |
+| Length | Short 30–50 s · Medium 45–65 s · Long 60–95 s (longer videos use more, smaller balls) |
+| Ending | Auto · Rim breaks · Gold wave · Flood the screen |
+
+Each card shows where the finale started ("finale at 1,000 balls · 31.2 s") and the controls used.
 
 ### Where things are
 

@@ -6,7 +6,7 @@
 // Each part has a pose(t) = translation + rotation about its pivot, built from motion primitives that are pure
 // functions of time (shared with the renderer): rotate, oscillate (angle), slide (translation), swing
 // (pendulum with escalating speed). Determinism: basic IEEE ops + dsin/dcos, counter RNG, fixed order.
-import { FPS, H } from '../core/constants.js';
+import { FPS, W, H } from '../core/constants.js';
 import { dsin, dcos } from './dmath.js';
 import { rand } from './rng.js';
 import { splitChance } from './pacing.js';
@@ -44,7 +44,7 @@ function squareish(ph) { const s = dsin(ph); return s * (1.5 - 0.5 * s * s); }
 export function partGeometry(p, pose) {
   const c = dcos(pose.a), s = dsin(pose.a);
   const W = (lx, ly) => [pose.x + lx * c - ly * s, pose.y + lx * s + ly * c];
-  if (p.type === 'capsule') return { a: W(p.u0, 0), b: W(p.u1, 0), thick: p.thick };
+  if (p.type === 'capsule' || p.type === 'beam') return { a: W(p.u0, 0), b: W(p.u1, 0), thick: p.thick };
   if (p.type === 'circle') return { c: W(p.at[0], p.at[1]), r: p.r };
   return { pts: p.pts.map(([lx, ly]) => W(lx, ly)) };
 }
@@ -68,6 +68,9 @@ export class MachineSim {
     const cs = 2 * c.ballR; this.cs = cs;
     this.gx0 = c.arena.cx - c.arena.r - cs; this.gy0 = c.arena.cy - c.arena.r - cs;
     this.gw = Math.ceil((2 * c.arena.r + 2 * cs) / cs); this.gh = this.gw;
+    if (c.ending.type === 'flood') {                // balls leave the arena and fill the frame: grid over the frame
+      this.gx0 = -cs; this.gy0 = -cs; this.gw = Math.ceil((W + 2 * cs) / cs); this.gh = Math.ceil((H + 2 * cs) / cs);
+    }
     this.cellStart = new Int32Array(this.gw * this.gh + 1);
     this.cellFill = new Int32Array(this.gw * this.gh);
     this.cellItems = new Int32Array(n); this.cellOf = new Int32Array(n);
@@ -75,6 +78,7 @@ export class MachineSim {
     this.closeN = new Float64Array(n * 2); this.otherN = new Float64Array(n * 2);
     this.cflags = new Uint8Array(n); this.closeV = new Float64Array(n);
     this.nb = new Int32Array(n); this.nbD = new Float64Array(n);
+    this.beamHit = new Uint8Array(n); this.passMax = 0;   // laser touches; worst share of balls inside a solid part
     this.geo = c.parts.map(() => null); this.prevGeo = c.parts.map(() => null);
     this.updateParts(0);
     this.prevGeo = this.geo.slice();
@@ -170,7 +174,9 @@ export class MachineSim {
     const S = c.substeps, h = 1 / (FPS * S);
     const r = c.ballR, d2 = 2 * r, lim = R - r;
     const broken = this.breakFrame >= 0;
-    const g = broken ? (c.ending.gravity || 1400) : this.count > 1 ? c.gravity : 0;
+    const flood = broken && c.ending.type === 'flood';
+    const g = flood ? 0 : broken ? (c.ending.gravity || 1400) : this.count > 1 ? c.gravity : 0;
+    const centre = c.gravityMode === 'center' && !broken;   // pull toward the arena centre instead of down
     this.splits = []; this.flags = 0; this.crushed = 0;
 
     for (let s = 0; s < S; s++) {
@@ -184,8 +190,15 @@ export class MachineSim {
       const n = this.count;
       for (let i = 0; i < n; i++) {
         this.px[i] = this.x[i]; this.py[i] = this.y[i];
-        this.vy[i] += g * h;
+        if (centre) {
+          const dx = cx - this.x[i], dy = cy - this.y[i], d = Math.sqrt(dx * dx + dy * dy);
+          if (d > 1e-6) { this.vx[i] += g * h * dx / d; this.vy[i] += g * h * dy / d; }
+        } else if (flood) {
+          const dx = this.x[i] - cx, dy = this.y[i] - cy, d = Math.sqrt(dx * dx + dy * dy);
+          if (d > 1e-6) { const a = (c.ending.push || 900) * h; this.vx[i] += a * dx / d; this.vy[i] += a * dy / d; }
+        } else this.vy[i] += g * h;
         this.x[i] += this.vx[i] * h; this.y[i] += this.vy[i] * h;
+        this.beamHit[i] = 0;
         this.cflags[i] = 0; this.closeV[i] = 0; this.nb[i] = -1; this.nbD[i] = 0;
       }
       this.buildGrid();
@@ -220,6 +233,15 @@ export class MachineSim {
         let x = this.x[i], y = this.y[i];
         for (let k = 0; k < P; k++) {
           const part = parts[k], G = this.geo[k];
+          if (part.type === 'beam') {                 // laser: balls pass through it; a touch splits (below)
+            const ax = G.a[0], ay = G.a[1], ex = G.b[0] - ax, ey = G.b[1] - ay, L2 = ex * ex + ey * ey;
+            let u = ((x - ax) * ex + (y - ay) * ey) / L2; u = u < 0 ? 0 : u > 1 ? 1 : u;
+            const qx = ax + ex * u, qy = ay + ey * u, dx = x - qx, dy = y - qy;
+            if (dx * dx + dy * dy < (G.thick + r) * (G.thick + r)) {
+              const L = Math.sqrt(L2); this.beamHit[i] = 1; this.closeN[2 * i] = -ey / L; this.closeN[2 * i + 1] = ex / L;
+            }
+            continue;
+          }
           if (part.type === 'capsule') {
             const ax = G.a[0], ay = G.a[1], ex = G.b[0] - ax, ey = G.b[1] - ay, L2 = ex * ex + ey * ey, L = Math.sqrt(L2);
             const ux = ex / L, uy = ey / L, rr = G.thick + r;
@@ -272,7 +294,10 @@ export class MachineSim {
           if (c.hubR) { const dx = x - cx, dy = y - cy, d = Math.sqrt(dx * dx + dy * dy) || 1e-9, hl = c.hubR + r;
             if (d < hl) { const nx = dx / d, ny = dy / d; x = cx + nx * hl; y = cy + ny * hl; this.contact(i, nx, ny, 0); } }
           const dx = x - cx, dy = y - cy, dd = dx * dx + dy * dy;
-          if (dd > lim * lim) {
+          if (flood) {
+            if (x < r) x = r; else if (x > W - r) x = W - r;
+            if (y < r) y = r; else if (y > H - r) y = H - r;
+          } else if (dd > lim * lim) {
             const d = Math.sqrt(dd), nx = dx / d, ny = dy / d;
             const inGap = broken && ny > this.cosGap;
             if (!broken || (!inGap && d < R + 2 * r)) { x = cx + nx * lim; y = cy + ny * lim; this.contact(i, -nx, -ny, 0); }
@@ -310,6 +335,10 @@ export class MachineSim {
             }
           }
         }
+        if (this.beamHit[i] && this.immune[i] === 0 && !capped && this.count < c.maxBalls) {
+          this.split(i, step); this.flags |= FLAG_SMASH; this.immune[i] = c.beamImmune || c.immuneFrames;
+          continue;
+        }
         if (squeezed) this.pinch[i]++; else this.pinch[i] = 0;
         // hook rule: the very first ball splits as soon as a moving part strikes it
         if (this.count === 1 && (fl & 1) && this.immune[i] === 0) this.pinch[i] = 2;
@@ -334,7 +363,7 @@ export class MachineSim {
     }
     if (this.capFrame < 0 && (this.count >= c.maxBalls || f >= c.safetyCap * FPS)) {
       this.capFrame = f; this.flags |= FLAG_CAP;
-      const brk = c.ending.type === 'rim-break';
+      const brk = c.ending.type === 'rim-break' || c.ending.type === 'flood';
       this.breakFrame = brk ? f + Math.round(c.finaleHold * FPS) : -1;
       this.outroFrame = f + Math.round(c.finaleHold * FPS) + (brk ? Math.round(c.ending.duration * FPS) : 0);
       this.endFrame = this.outroFrame + Math.round(c.outro * FPS) - 1;
@@ -348,13 +377,40 @@ export class MachineSim {
       }
     }
     if (f === this.breakFrame) this.flags |= FLAG_BREAK;
+    if (c.checkSolid && (f % 6) === 0 && this.breakFrame < 0) this.measureSolid();
     if (f === this.outroFrame) this.flags |= FLAG_OUTRO;
     this.frame++;
     return f;
   }
 
+  /** Share of balls sitting deep inside a solid part (a "transparent part" bug if it is ever large). */
+  measureSolid() {
+    const parts = this.cfg.parts, r = this.cfg.ballR, n = this.count; if (n < 50) return;   // a share of a handful of balls means nothing
+    let inside = 0;
+    for (let i = 0; i < n; i++) {
+      if (this.immune[i] > 0) continue;              // being split or ejected right now: overlap is expected
+      const x = this.x[i], y = this.y[i];
+      for (let k = 0; k < parts.length; k++) {
+        const p = parts[k], G = this.geo[k];
+        if (p.type === 'beam') continue;
+        let pen = 0;
+        if (p.type === 'capsule') {
+          const ax = G.a[0], ay = G.a[1], ex = G.b[0] - ax, ey = G.b[1] - ay;
+          let u = ((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey); u = u < 0 ? 0 : u > 1 ? 1 : u;
+          const dx = x - ax - ex * u, dy = y - ay - ey * u; pen = G.thick + r - Math.sqrt(dx * dx + dy * dy);
+        } else if (p.type === 'circle') {
+          const dx = x - G.c[0], dy = y - G.c[1]; pen = G.r + r - Math.sqrt(dx * dx + dy * dy);
+        } else {
+          let sd = -Infinity; for (const e of G.edges) { const v = e.nx * x + e.ny * y - e.d; if (v > sd) sd = v; } pen = r - sd;
+        }
+        if (pen > r * 1.9) { inside++; break; }      // the centre is (almost) on the part's own axis / deep inside
+      }
+    }
+    const share = inside / n; if (share > this.passMax) this.passMax = share;
+  }
+
   move(from, to) {
-    for (const a of [this.x, this.y, this.px, this.py, this.vx, this.vy, this.gen, this.age, this.immune, this.col, this.id, this.pinch]) a[to] = a[from];
+    for (const a of [this.x, this.y, this.px, this.py, this.vx, this.vy, this.gen, this.age, this.immune, this.col, this.id, this.pinch, this.beamHit]) a[to] = a[from];
     const P = this.cfg.parts.length;
     for (let q = 0; q < P; q++) this.side[to * P + q] = this.side[from * P + q];
   }

@@ -30,6 +30,7 @@ export function runHeadless(config, { onProgress } = {}) {
     scenario: config.scenario, seed: config.seed,
     frameCount, durationS: frameCount / FPS, completed: sim.done,
     capFrame: sim.capFrame, outroFrame: sim.outroFrame, endFrame: sim.endFrame, hookFrame, nonFinite,
+    passMax: sim.passMax || 0, capN: sim.capFrame >= 0 ? n[sim.capFrame] : 0,
     maxBalls: Math.max(0, ...n.slice(-1)),
     timeline: {
       n: Uint32Array.from(n), flags: Uint32Array.from(flags),

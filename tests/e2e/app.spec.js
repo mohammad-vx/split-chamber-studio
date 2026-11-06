@@ -167,7 +167,7 @@ test('every pattern can be played live', async () => {
     await page.click('#btn-menu1');        // back to the live menu
     await expect(page.locator('#menu')).toBeVisible();
   }
-  await page.selectOption('#opt-pattern', 'split-chamber@2');
+  await page.selectOption('#opt-pattern', 'split-chamber@3');
 });
 
 test('Back to Studio returns to the home screen without closing the app', async () => {

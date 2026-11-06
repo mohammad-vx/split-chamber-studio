@@ -2,6 +2,7 @@
 // check → candidate; Accept → verified master. The main process owns all disk writes (library IPC).
 import { FPS } from '../core/constants.js';
 import { getScenario, listedScenarios } from '../scenarios/index.js';
+import { applyControls } from '../scenarios/controls.js';
 import { metaFromSummary } from '../sim/run.js';
 import { renderSoundtrackFor } from '../audio/synth.js';
 import { startExport, AUTO_ORDER } from '../export/exporter.js';
@@ -61,7 +62,7 @@ export class Pipeline {
     const results = [];
     const batchSeed = (Date.now() >>> 0) ^ 0x5eed;
     const started = new Date();
-    const batch = { id: `b${started.toISOString().replace(/[-:T]/g, '').slice(0, 14)}`, startedAt: started.toISOString(), total: opts.count, pattern: opts.pattern || 'random', captions: opts.captions || 'none' };
+    const batch = { id: `b${started.toISOString().replace(/[-:T]/g, '').slice(0, 14)}`, startedAt: started.toISOString(), total: opts.count, pattern: opts.pattern || 'random', captions: opts.captions || 'none', controls: opts.controls || null };
     this.batch = batch;
     this.emit({ type: 'batch-start', batch });
     try {
@@ -75,7 +76,7 @@ export class Pipeline {
         this.emit({ type: 'batch', index: i, total: opts.count, scenario: key, seed });
         let st;
         try {
-          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i } });
+          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i }, controls: opts.controls });
           if (st.status === 'candidate' && (opts.acceptAll || (opts.autoAcceptScore != null && st.score >= opts.autoAcceptScore))) st = await this.accept(st.id);
         } catch (e) {
           if (this.cancelled) break;
@@ -108,9 +109,9 @@ export class Pipeline {
   }
 
   /** One candidate. Returns its status object (candidate | rejected | failed). */
-  async generateOne({ scenarioKey, seed, captions, batch = null }) {
+  async generateOne({ scenarioKey, seed, captions, batch = null, controls = null }) {
     const sc = getScenario(scenarioKey);
-    const config = sc.generate(seed);
+    const config = applyControls(sc.generate(seed), controls || {});
     const id = await S().id(config);
     const existing = await S().get(id);
     if (existing && (existing.status === 'candidate' || existing.status === 'accepted')) return { ...existing, duplicateOf: id };
@@ -119,7 +120,7 @@ export class Pipeline {
     const status = {
       id, status: 'generating', scenario: scenarioKey, label: sc.label, seed, caption,
       createdAt: new Date().toISOString(), appVersion: APP_VERSION, versions: config.versions, reasons: [],
-      ...(batch ? { batch } : {}),
+      ...(batch ? { batch } : {}), ...(config.controls ? { controls: config.controls } : {}),
     };
     this.emit({ type: 'config', id, config, scenario: scenarioKey, label: sc.label, seed, batch });
     await S().writeStatus(id, status);
@@ -150,7 +151,7 @@ export class Pipeline {
     const summary = await runHeadlessInWorker(config, (f) => this.stage(id, 'simulate', { frame: f }));
     const metrics = {
       frameCount: summary.frameCount, durationS: summary.durationS, hookS: summary.hookFrame / FPS,
-      capS: summary.capFrame / FPS, simMs: Math.round(summary.simMs), curve: curveDescriptor(summary.timeline),
+      capS: summary.capFrame / FPS, capN: summary.capN, simMs: Math.round(summary.simMs), curve: curveDescriptor(summary.timeline),
       hashes: b64(summary.hashes),
     };
     await S().writeFile(id, 'metrics.json', JSON.stringify(metrics));
@@ -187,7 +188,7 @@ export class Pipeline {
     if (reasons.length) return reject(reasons, 'analyse');
 
     const st = await S().update(id, {
-      status: 'candidate', durationS: summary.durationS, frameCount: summary.frameCount,
+      status: 'candidate', durationS: summary.durationS, frameCount: summary.frameCount, capN: summary.capN, capS: summary.capFrame / FPS,
       preview: { file: 'preview.mp4', verify: preview.verify.summary, engine: preview.engineLabel },
       thumb: 'thumb.jpg', audio, audioMastering: audioStats, video, descriptor, nearest: dup.nearest,
       score: score(config, summary, audio, dup.nearest), scoreParts: scoreParts(config, summary, audio, dup.nearest), checks,
@@ -283,7 +284,8 @@ export class Pipeline {
 
   async variation(id, captions) {
     const st = await S().get(id);
-    return this.generateOne({ scenarioKey: st.scenario, seed: await this.freshSeed(st.scenario), captions: captions || (st.caption ? st.caption.lang : 'none') });
+    const ctl = st.controls ? { ...st.controls, gravity: st.controls.gravity, ending: st.controls.ending === 'cap-gold' ? 'gold' : st.controls.ending } : null;
+    return this.generateOne({ scenarioKey: st.scenario, seed: await this.freshSeed(st.scenario), captions: captions || (st.caption ? st.caption.lang : 'none'), controls: ctl });
   }
 }
 

@@ -121,6 +121,8 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     const reasons = (it.reasons || []).slice(0, 2).map((r) => `<li>${r}</li>`).join('');
     el.innerHTML = `${thumb}<div class="meta"><strong>${it.label || it.scenario}</strong>
       <span>seed ${it.seed}${it.durationS ? ` · ${it.durationS.toFixed(1)} s` : ''}${it.score != null ? ` · score ${it.score}` : ''}</span>
+      ${it.capN ? `<span>finale at ${it.capN.toLocaleString('en-US')} balls · ${it.capS.toFixed(1)} s</span>` : ''}
+      ${it.controls ? `<span class="cap">gravity ${it.controls.gravity} · ${it.controls.length} · ${it.controls.ending}</span>` : ''}
       ${it.caption ? `<span class="cap">${it.caption.lang.toUpperCase()}: <bdi dir="auto">${it.caption.text}</bdi></span>` : ''}
       ${reasons ? `<ul class="why">${reasons}</ul>` : ''}${it.lastError ? `<ul class="why"><li>${it.lastError.split('\n')[0]}</li></ul>` : ''}</div>`;
     el.onclick = () => { state.sel = i; render(); };
@@ -252,7 +254,8 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     state.tab = 'review';
     await run(`Generating ${count} video${count > 1 ? 's' : ''}`, async () => {
       const autoAcceptScore = $('st-auto').checked ? Number($('st-auto-score').value) : null;
-      const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, owner: 'ui' });
+      const controls = { gravity: $('st-gravity').value, target: $('st-target').value === 'max' ? 'max' : Number($('st-target').value), length: $('st-length').value, ending: $('st-ending').value };
+      const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, controls, owner: 'ui' });
       const ok = res.filter((r) => r.status === 'candidate').length, accd = res.filter((r) => r.status === 'accepted').length;
       const rej = res.filter((r) => r.status === 'rejected').length, fail = res.length - ok - accd - rej;
       toast(`Batch finished (${count} requested): ${ok} waiting for review${accd ? `, ${accd} auto-accepted` : ''}, ${rej} rejected by the checks${fail ? `, ${fail} failed` : ''}${res.length < count ? `, ${count - res.length} not made` : ''}.`, 9000);

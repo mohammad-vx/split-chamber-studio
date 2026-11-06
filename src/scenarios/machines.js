@@ -14,7 +14,7 @@ const range = (seed, salt, lo, hi, k) => lo + r01(seed, salt, k) * (hi - lo);
 const pick = (seed, salt, arr, k) => arr[Math.floor(r01(seed, salt, k) * arr.length)];
 const ARENA = { cx: 540, cy: 1000, r: 460 };
 
-function baseMachine(seed, salt, over) {
+export function baseMachine(seed, salt, over) {
   const ballR = over.ballR || 8.5;
   const free = Math.PI * ARENA.r * ARENA.r * (over.freeFraction || 0.9);
   const maxBalls = Math.floor(0.6 * free / (Math.PI * ballR * ballR) / 50) * 50;
@@ -31,9 +31,9 @@ function baseMachine(seed, salt, over) {
 }
 
 /** The gold ending has no 3 s rim-break segment: hold the gold finale longer instead. */
-function finalize(m) { if (m.ending.type !== 'rim-break') m.finaleHold = 5.5; return m; }
+export function finalize(m) { if (m.ending.type !== 'rim-break') m.finaleHold = 5.5; return m; }
 
-function wrap(key, label, machine, seed, tempo, extra = {}) {
+export function wrap(key, label, machine, seed, tempo, extra = {}) {
   return {
     scenario: key, seed, mode: 'packed',
     duration: { minS: 30, maxS: 45 },

@@ -11,7 +11,7 @@ const range = (seed, lo, hi, k) => lo + r01(seed, k) * (hi - lo);
 const pick = (seed, arr, k) => arr[Math.floor(r01(seed, k) * arr.length)];
 
 /** Trapezoid wedge from the rim inward, centred at angle a. */
-function wedge(arena, a, rin, halfIn, halfOut) {
+export function wedge(arena, a, rin, halfIn, halfOut) {
   const { cx, cy, r } = arena, ro = r + 200;   // far outside the rim: the outer edge must never be the nearest face
   const P = (rad, ang) => [cx + dcos(ang) * rad, cy + dsin(ang) * rad];
   return [P(rin, a - halfIn), P(ro, a - halfOut), P(ro, a + halfOut), P(rin, a + halfIn)];

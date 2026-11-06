@@ -32,7 +32,12 @@ export function explainRun(config, s) {
     out.push(row('simulation', 'Climax size', `${Math.round(fill * 100)} % of ${world2.maxBalls} balls`, `≥ ${Math.round(fillMin * 100)} %`, fill >= fillMin,
       `climax too small: ${Math.round(fill * 100)} % of the ${world2.maxBalls} balls when time ran out (minimum ${Math.round(fillMin * 100)} %)`));
   }
-  const world = config.orbit || config.packed || {};
+  const solidMax = config.checks && config.checks.solidMax;
+  if (solidMax != null && s.passMax != null) {
+    out.push(row('simulation', 'No ball passes through a solid part', `${(s.passMax * 100).toFixed(1)} % at worst`, `≤ ${(solidMax * 100).toFixed(0)} %`, s.passMax <= solidMax,
+      `balls passed through a solid part (${(s.passMax * 100).toFixed(1)} % at worst)`));
+  }
+  const world = config.orbit || config.packed || config.machine || {};
   const ballR = world.ballR || 6.5, arenaR = (world.arena && world.arena.r) || 460;
   const coverageMin = (config.checks && config.checks.coverageMin) || LIMITS.coverageMin;
   const half = s.timeline.n[Math.floor(s.frameCount / 2)] || 0;

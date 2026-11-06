@@ -110,6 +110,10 @@
       <label>Pattern <select id="st-pattern"></select></label>
       <label>Videos <input id="st-count" type="number" min="1" max="200" value="3"></label>
       <div id="st-counts" class="row-inline"><button data-n="1">1</button><button data-n="5">5</button><button data-n="10">10</button><button data-n="20">20</button><button data-n="50">50</button></div>
+      <label>Gravity <select id="st-gravity"><option value="auto">Auto (best for the machine)</option><option value="on">On</option><option value="off">Off (floating)</option><option value="center">Toward the centre</option></select></label>
+      <label>Stop at <select id="st-target"><option value="max">Full arena</option><option value="300">300 balls</option><option value="500">500 balls</option><option value="1000">1,000 balls</option><option value="1500">1,500 balls</option></select></label>
+      <label>Length <select id="st-length"><option value="short">Short · 30–50 s</option><option value="medium">Medium · 45–65 s</option><option value="long">Long · 60–95 s</option></select></label>
+      <label>Ending <select id="st-ending"><option value="auto">Auto</option><option value="rim-break">Rim breaks</option><option value="gold">Gold wave</option><option value="flood">Flood the screen</option></select></label>
       <label>Text <select id="st-captions"><option value="none">No text</option><option value="en">English</option><option value="ar">العربية</option></select></label>
       <label class="toggle small"><input type="checkbox" id="st-auto"><span></span>Auto-accept score ≥ <input id="st-auto-score" type="number" min="0" max="100" value="80"></label>
       <button id="st-start" class="primary">Start</button>
@@ -142,8 +146,8 @@
       <h2>How a video is made, checked, accepted or rejected</h2>
       <ol>
         <li><b>Design.</b> The pattern you chose (or a random one) builds a machine from the video's <i>seed</i>: part sizes, speeds, tempo, gravity, colours. The same seed always gives the same video.</li>
-        <li><b>Simulate.</b> The physics runs in the background, frame by frame (no picture yet). Every ball squeezed between a moving part and a wall or another part splits. When the arena is full, or the time limit is reached, the gold finale starts.</li>
-        <li><b>Simulation checks</b> (about 3 s, cheap). Rejected immediately if: physics unstable · no ending · length outside the pattern's range · first split later than 3 s · climax too small · scene too empty at half time.</li>
+        <li><b>Simulate.</b> The physics runs in the background, frame by frame (no picture yet). Every part is solid: balls collide with it, and a ball squeezed between a moving part and a wall or another part always splits. The only thing balls pass through is a glowing laser, which splits what it touches. The finale starts when the ball count you chose in <i>Stop at</i> is reached (or the arena is full), or when the time for the chosen <i>Length</i> runs out.</li>
+        <li><b>Simulation checks</b> (about 3 s, cheap). Rejected immediately if: physics unstable · a ball passed through a solid part · no ending · length outside the pattern's range · first split later than 3 s · climax too small · scene too empty at half time.</li>
         <li><b>Soundtrack and preview.</b> Music and impact sounds are generated in sync with the frames, and a small 540×960 preview is rendered.</li>
         <li><b>Preview checks</b> on the real file: loudness −17…−13 LUFS · true peak ≤ −1 dBTP · no silence over 1.5 s · no frozen or black picture over 1 s · not too similar to a video you already accepted.</li>
         <li><b>Waiting for review.</b> A video that passes every check gets a <b>score</b> (base 50 + early hook + comfortable length + loudness + novelty) and waits for you. Nothing is accepted without you, unless you turned on <i>Auto-accept score ≥ N</i>.</li>

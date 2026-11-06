@@ -29,6 +29,10 @@ const TEMPLATES = {
     en: ['The walls close in. Every squeeze makes three.', 'Two walls. One ball. {max} balls.', 'How long until the walls are full?'],
     ar: ['الجدران تقترب… وكل ضغطة تصنع ثلاثاً', 'جداران وكرة واحدة و{max} كرة.', 'متى تمتلئ المساحة بين الجدران؟'],
   },
+  'laser-cross': {
+    en: ['The laser splits everything it touches', 'One laser. One ball. {max} balls.', 'Nothing survives the laser in one piece'],
+    ar: ['الليزر يقسم كل ما يلمسه', 'ليزر واحد وكرة واحدة و{max} كرة.', 'لا شيء يعبر الليزر سليماً'],
+  },
   'orbit-crusher': {
     en: ['Every blade cut makes three balls', 'Can the orbit hold {max} balls?', '{blades} blades. One orbit. {max} balls.', 'The blades never stop. Neither do the balls.'],
     ar: ['كل ضربة شفرة تصنع ثلاث كرات', 'هل يتسع المدار لـ {max} كرة؟', '{blades} شفرات، مدار واحد، {max} كرة.', 'الشفرات لا تتوقف… والكرات أيضاً.'],
@@ -43,7 +47,7 @@ export function captionFor(config, lang) {
   if (!set) return null;
   const i = Math.floor(rand(config.seed >>> 0, 0xca9, lang === 'ar' ? 2 : 1, 0) * set.length);
   const max = (config.orbit && config.orbit.maxBalls) || (config.packed && config.packed.maxBalls) || (config.machine && config.machine.maxBalls) || 10000;
-  const blades = (config.orbit && config.orbit.blades.count) || 0;
+  const blades = (config.orbit && config.orbit.blades.count) || (config.machine && config.machine.bladeCount) || 4;
   const text = set[i].replace('{max}', fmt(max)).replace('{blades}', String(blades));
   return { lang, text };
 }

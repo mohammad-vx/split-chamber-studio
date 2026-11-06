@@ -110,3 +110,23 @@ now; (4) after a batch, show clearly how many went to review and how many were r
 - **Watch live.** While a batch runs, the header button becomes "● Watch live": the same config is simulated
   again in real time and drawn (deterministic → the same frames being rendered); it follows the batch to the
   next video. Without a batch, Live play opens the game with all 7 patterns.
+
+## Step 8 — Phase 1 of docs/PLAN-NEXT.md: one engine, one rule, owner controls (2026-11-06)
+
+- **Why parts looked transparent:** orbit-crusher@1 and split-chamber@2 (swarm engines) never collided balls with
+  their blades/presses; a "cut" split by probability and otherwise nudged the ball, so it seemed to pass through.
+  Measuring balls deep inside parts also exposed walls@2 (walls close into each other: 100 % of balls inside at the
+  worst moment) and kaleidoscope@2 (triangles overlap: 5–11 %).
+- **All listed patterns now run on the machine engine with the contact rule:** split-chamber@3 (four solid presses,
+  pull to the centre), orbit-crusher@2 (two blades turning in opposite directions, pull to the centre),
+  rotary-sweeper@3 (arms + static wedges), walls@3 (stop one ball apart), jaws@2, rams@2, and the new
+  **laser-cross@1** (a see-through laser `beam` part that always splits what it touches). kaleidoscope is unlisted:
+  no gap was both safe (no overlap) and productive; it returns redesigned in phase 2. Older versions stay registered.
+- **Engine additions** (all opt-in by config, all older goldens unchanged): `gravityMode: 'center'`, `beam` parts,
+  `flood` ending (rim dissolves, balls pushed out and kept inside the frame), `checkSolid` measure → `passMax`;
+  run check *No ball passes through a solid part* (≤ 3.5 %, orbit ≤ 6 % because two crossing blades overlap for an
+  instant).
+- **Controls** (`src/scenarios/controls.js`, Generate panel, stored in each config): gravity, stop-at count,
+  length (medium/long = smaller balls + slower machine, extra slowing for fast growers), ending.
+- **Validation, default controls, seeds 300–311:** jaws 12/12, rams 12/12, orbit 12/12, rotary 11/12, laser 10/12,
+  walls 10/12, split 9/12. Medium length spot-checks: jaws 5/5; long length is the least reliable (≈ 60 %).
