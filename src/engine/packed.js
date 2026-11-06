@@ -239,12 +239,14 @@ export class PackedSim {
       }
       // pinch: closing arm + opposing static contact, sustained
       const capped = this.capFrame >= 0;
+      const contactRule = c.pinchRule === 'contact';
       for (let i = 0; i < n; i++) {
         const fl = flagsC[i];
-        let squeezed = false;
+        let squeezed = false, wall = 0;
         if ((fl & 1) && this.immune[i] === 0) {
           const ax = armN[2 * i], ay = armN[2 * i + 1];
-          if ((fl & 2) && ax * statN[2 * i] + ay * statN[2 * i + 1] < -0.5) squeezed = true;          // arm vs wall
+          if ((fl & 2) && ax * statN[2 * i] + ay * statN[2 * i + 1] < -0.5) { squeezed = true; wall = 1; } // arm vs wall
+          else if (contactRule) { if (nbD[i] > c.pileSqueeze * r) squeezed = true; }                     // v2: piles only eject
           else if (nbD[i] > c.pileSqueeze * r) squeezed = true;                                       // arm ploughing a compressed pile
           else {
             const j = nb[i];                                                                          // arm vs pinned neighbour
@@ -255,8 +257,12 @@ export class PackedSim {
           }
         }
         if (squeezed) this.pinch[i]++; else this.pinch[i] = 0;
-        if (this.pinch[i] >= 2) {
+        if (contactRule ? (wall || this.pinch[i] >= 2) : this.pinch[i] >= 2) {
           this.pinch[i] = 0;
+          if (contactRule) {                                        // v2: a real pinch always splits, a pile push never does
+            if (wall && !capped && this.count < c.maxBalls) { this.split(i, step); } else this.eject(i, step);
+            continue;
+          }
           const p = this.count === 1 ? 1 : splitChance(this.count, t, c.pacing, c.maxBalls);
           if (!capped && this.count < c.maxBalls && rand(this.seed, this.id[i], step, P_SPLIT) < p) this.split(i, step);
           else this.eject(i, step);

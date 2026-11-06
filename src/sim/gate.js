@@ -73,4 +73,9 @@ export const GOLDENS = [
   { key: 'rams@1', seeds: [1, 7], rawPortable: true },
   { key: 'kaleidoscope@1', seeds: [1, 8], rawPortable: true },
   { key: 'walls@1', seeds: [1, 7], rawPortable: true },
+  { key: 'rotary-sweeper@2', seeds: [1, 7], rawPortable: true },
+  { key: 'jaws@2', seeds: [1, 7], rawPortable: true },
+  { key: 'rams@2', seeds: [1, 7], rawPortable: true },
+  { key: 'kaleidoscope@2', seeds: [1, 7], rawPortable: true },
+  { key: 'walls@2', seeds: [1, 7], rawPortable: true },
 ];

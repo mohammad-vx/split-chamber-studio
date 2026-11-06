@@ -293,12 +293,14 @@ export class MachineSim {
         this.vx[i] = vx; this.vy[i] = vy;
       }
       const capped = this.capFrame >= 0;
+      const contactRule = c.pinchRule === 'contact';
       for (let i = 0; i < n; i++) {
         const fl = this.cflags[i];
-        let squeezed = false;
+        let squeezed = false, wall = 0;
         if ((fl & 1) && this.immune[i] === 0) {
           const ax = this.closeN[2 * i], ay = this.closeN[2 * i + 1];
-          if ((fl & 2) && ax * this.otherN[2 * i] + ay * this.otherN[2 * i + 1] < -0.5) squeezed = true;
+          if ((fl & 2) && ax * this.otherN[2 * i] + ay * this.otherN[2 * i + 1] < -0.5) { squeezed = true; wall = 1; }
+          else if (contactRule) { if (this.nbD[i] > c.pileSqueeze * r) squeezed = true; }   // v2: piles only eject
           else if (this.nbD[i] > c.pileSqueeze * r) squeezed = true;
           else {
             const j = this.nb[i];
@@ -311,8 +313,14 @@ export class MachineSim {
         if (squeezed) this.pinch[i]++; else this.pinch[i] = 0;
         // hook rule: the very first ball splits as soon as a moving part strikes it
         if (this.count === 1 && (fl & 1) && this.immune[i] === 0) this.pinch[i] = 2;
+        if (contactRule && wall && this.immune[i] === 0) this.pinch[i] = 2;
         if (this.pinch[i] >= 2) {
           this.pinch[i] = 0;
+          if (contactRule) {                                        // v2: a real pinch always splits, a pile push never does
+            if ((wall || this.count === 1) && !capped && this.count < c.maxBalls) { this.split(i, step); this.flags |= FLAG_SMASH; }
+            else this.eject(i, step);
+            continue;
+          }
           const p = this.count === 1 ? 1 : splitChance(this.count, t, c.pacing, c.maxBalls);
           if (!capped && this.count < c.maxBalls && rand(this.seed, this.id[i], step, P_SPLIT) < p) { this.split(i, step); this.flags |= FLAG_SMASH; }
           else this.eject(i, step);

@@ -7,7 +7,7 @@ import { renderSoundtrackFor } from '../audio/synth.js';
 import { startExport, AUTO_ORDER } from '../export/exporter.js';
 import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
-import { checkRun, checkAudio, checkVideo, checkQuality, curveDescriptor, findDuplicate, score } from './checks.js';
+import { explainRun, explainAudio, explainVideo, explainDuplicate, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
 export const APP_VERSION = '2.0.0';
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
@@ -60,6 +60,10 @@ export class Pipeline {
     await S().powerBlock(true);
     const results = [];
     const batchSeed = (Date.now() >>> 0) ^ 0x5eed;
+    const started = new Date();
+    const batch = { id: `b${started.toISOString().replace(/[-:T]/g, '').slice(0, 14)}`, startedAt: started.toISOString(), total: opts.count, pattern: opts.pattern || 'random', captions: opts.captions || 'none' };
+    this.batch = batch;
+    this.emit({ type: 'batch-start', batch });
     try {
       await S().queue('save', { ...opts, done: 0, startedAt: new Date().toISOString() });
       for (let i = 0; i < opts.count && !this.cancelled; i++) {
@@ -71,7 +75,7 @@ export class Pipeline {
         this.emit({ type: 'batch', index: i, total: opts.count, scenario: key, seed });
         let st;
         try {
-          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none' });
+          st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i } });
           if (st.status === 'candidate' && (opts.acceptAll || (opts.autoAcceptScore != null && st.score >= opts.autoAcceptScore))) st = await this.accept(st.id);
         } catch (e) {
           if (this.cancelled) break;
@@ -86,7 +90,8 @@ export class Pipeline {
       await S().powerBlock(false);
       await S().unlock();
     }
-    this.emit({ type: 'batch-done', results });
+    this.batch = null;
+    this.emit({ type: 'batch-done', results, batch });
     return results;
   }
 
@@ -103,7 +108,7 @@ export class Pipeline {
   }
 
   /** One candidate. Returns its status object (candidate | rejected | failed). */
-  async generateOne({ scenarioKey, seed, captions }) {
+  async generateOne({ scenarioKey, seed, captions, batch = null }) {
     const sc = getScenario(scenarioKey);
     const config = sc.generate(seed);
     const id = await S().id(config);
@@ -114,7 +119,9 @@ export class Pipeline {
     const status = {
       id, status: 'generating', scenario: scenarioKey, label: sc.label, seed, caption,
       createdAt: new Date().toISOString(), appVersion: APP_VERSION, versions: config.versions, reasons: [],
+      ...(batch ? { batch } : {}),
     };
+    this.emit({ type: 'config', id, config, scenario: scenarioKey, label: sc.label, seed, batch });
     await S().writeStatus(id, status);
     await S().writeFile(id, 'config.json', JSON.stringify(config, null, 1));
     try {
@@ -129,9 +136,10 @@ export class Pipeline {
   }
 
   async generateBody(id, sc, config, scenarioKey, seed, caption, t0) {
+    const checks = [];
     const reject = async (reasons, stage) => {
       await S().removeMedia(id);
-      const st = await S().update(id, { status: 'rejected', reasons, rejectedAt: stage, timings: { totalS: (performance.now() - t0) / 1000 } });
+      const st = await S().update(id, { status: 'rejected', reasons, rejectedAt: stage, checks, timings: { totalS: (performance.now() - t0) / 1000 } });
       await S().rejectLog({ scenario: scenarioKey, seed, id, reasons, auto: true });
       this.emit({ type: 'item', status: st });
       return st;
@@ -146,7 +154,8 @@ export class Pipeline {
       hashes: b64(summary.hashes),
     };
     await S().writeFile(id, 'metrics.json', JSON.stringify(metrics));
-    const runReasons = checkRun(config, summary);
+    checks.push(...explainRun(config, summary));
+    const runReasons = checks.filter((c) => !c.ok).map((c) => c.reason);
     if (runReasons.length) return reject(runReasons, 'simulate');
 
     // 3. audio
@@ -173,15 +182,15 @@ export class Pipeline {
     const descriptor = { curve: metrics.curve, dhash };
     const accepted = (await S().list()).filter((x) => x.status === 'accepted' && x.id !== id);
     const dup = findDuplicate(descriptor, accepted);
-    const reasons = [...checkAudio(audio), ...checkVideo(video)];
-    if (dup.duplicate) reasons.push(`too similar to accepted video ${dup.nearest.id}`);
+    checks.push(...explainAudio(audio), ...explainVideo(video), explainDuplicate(dup));
+    const reasons = checks.filter((c) => !c.ok).map((c) => c.reason);
     if (reasons.length) return reject(reasons, 'analyse');
 
     const st = await S().update(id, {
       status: 'candidate', durationS: summary.durationS, frameCount: summary.frameCount,
       preview: { file: 'preview.mp4', verify: preview.verify.summary, engine: preview.engineLabel },
       thumb: 'thumb.jpg', audio, audioMastering: audioStats, video, descriptor, nearest: dup.nearest,
-      score: score(config, summary, audio, dup.nearest),
+      score: score(config, summary, audio, dup.nearest), scoreParts: scoreParts(config, summary, audio, dup.nearest), checks,
       timings: { totalS: (performance.now() - t0) / 1000, simMs: metrics.simMs, previewS: preview.seconds },
     });
     this.emit({ type: 'item', status: st });

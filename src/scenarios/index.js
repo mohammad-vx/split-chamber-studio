@@ -3,8 +3,12 @@ import { splitChamberV1, splitChamberV2 } from './split-chamber.js';
 import { orbitCrusherV1 } from './orbit-crusher.js';
 import { rotarySweeperV1 } from './rotary-sweeper.js';
 import { jawsV1, ramsV1, kaleidoscopeV1, wallsV1 } from './machines.js';
+import { rotarySweeperV2, jawsV2, ramsV2, kaleidoscopeV2, wallsV2 } from './contact-v2.js';
 
-const ALL = [splitChamberV1, splitChamberV2, orbitCrusherV1, rotarySweeperV1, jawsV1, ramsV1, kaleidoscopeV1, wallsV1];
+// @1 of the packed families stays registered (frozen, reproducible) but is no longer offered: @2 replaces it.
+const ALL = [splitChamberV1, splitChamberV2, orbitCrusherV1, rotarySweeperV1, jawsV1, ramsV1, kaleidoscopeV1, wallsV1,
+  rotarySweeperV2, jawsV2, ramsV2, kaleidoscopeV2, wallsV2];
+for (const s of [rotarySweeperV1, jawsV1, ramsV1, kaleidoscopeV1, wallsV1]) s.listed = false;
 export const SCENARIOS = Object.fromEntries(ALL.map((s) => [s.key, s]));
 export const DEFAULT_SCENARIO = 'split-chamber@2';
 

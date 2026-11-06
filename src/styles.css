@@ -127,3 +127,28 @@ input[type=text], select { font: inherit; color: var(--text); background: rgba(0
 #st-stats { margin-left: auto; }
 .toggle.small { font-size: 13px; color: var(--muted); }
 .toggle.small input[type=number] { display: inline-block; width: 54px; margin-left: 4px; }
+
+/* batch summary, explanations, help */
+.st-batch { margin: 0 24px 10px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.st-batch .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.st-batch .head strong { font-size: 14px; }
+.st-batch .head button { margin-left: auto; padding: 4px 10px; font-size: 12px; }
+.st-batch .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.st-batch .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04); cursor: pointer; }
+.st-batch .chip b { font-size: 15px; margin-right: 4px; }
+.st-batch .chip.review b { color: var(--gold); } .st-batch .chip.ok b { color: var(--green); } .st-batch .chip.bad b { color: var(--red); }
+.st-batch ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.st-why { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 12px; }
+.st-why h3 { font-size: 13px; margin: 8px 0 4px; }
+.st-why table { width: 100%; border-collapse: collapse; }
+.st-why td { padding: 2px 3px; vertical-align: top; }
+.st-why td.v { color: var(--muted); }
+.st-why tr.fail td { color: #ff9a8a; }
+.st-why .ico { width: 14px; }
+.st-why .total { font-weight: 650; border-top: 1px solid var(--line); }
+.st-actions { width: 300px; }
+.st-howto { background: var(--panel, #0e1218); color: var(--text); border: 1px solid var(--line); border-radius: 14px; max-width: 680px; padding: 20px 24px; line-height: 1.5; }
+.st-howto::backdrop { background: rgba(0,0,0,.7); }
+.st-howto h2 { margin-top: 0; font-size: 18px; }
+.st-howto li { margin-bottom: 8px; }
+#hud-live { color: var(--gold); font-weight: 600; }

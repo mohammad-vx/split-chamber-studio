@@ -35,3 +35,22 @@ test('part geometry follows the pose', () => {
   const g = partGeometry(p, partPose(p, 0.25));
   assert.ok(Math.abs(g.a[0] - 110) < 1e-6 && Math.abs(g.b[0] - 160) < 1e-6);
 });
+
+// v2 contact rule (user feedback 2026-11-06): a ball pinched between a moving part and a fixed surface always
+// splits. Proof: with the split probability forced to zero, v2 still grows (pinches decide), v1 cannot.
+for (const key of ['jaws@2', 'rams@2', 'kaleidoscope@2', 'walls@2', 'rotary-sweeper@2']) {
+  test(`${key}: every real pinch splits (no probability), passes the run checks`, () => {
+    const sc = getScenario(key), cfg = sc.generate(1);
+    const w = cfg.machine || cfg.packed;
+    assert.equal(w.pinchRule, 'contact');
+    const a = runHeadless(cfg);
+    assert.deepEqual(checkRun(cfg, a), []);
+    const zero = sc.generate(1); (zero.machine || zero.packed).pacing = { p0: 0, pmin: 0, capTime: 30 };
+    const z = runHeadless(zero);
+    assert.deepEqual([...z.hashes], [...a.hashes], 'pacing must have no influence under the contact rule');
+    const v1 = getScenario(key.replace('@2', '@1')), c1 = v1.generate(1);
+    (c1.machine || c1.packed).pacing = { p0: 0, pmin: 0, capTime: 30 }; (c1.machine || c1.packed).safetyCap = 12;
+    const o = runHeadless({ ...c1, duration: { minS: 0, maxS: 60 } });
+    assert.ok(Math.max(...o.timeline.n.slice(0, 600)) <= 3, 'v1 should not grow without the probability');
+  });
+}

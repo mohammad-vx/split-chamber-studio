@@ -78,6 +78,55 @@ test('UI: generate, review, accept with verified master, reproduce, reject', asy
   await app.close();
 });
 
+test('UI: batch summary, live view of the running video, and per-video explanation', async () => {
+  const lib = tmp('batch');
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.waitForSelector('#studio:not(.hidden)');
+
+  await page.click('#st-help');
+  await expect(page.locator('#st-howto')).toBeVisible();
+  await page.click('#st-howto-close');
+
+  await page.click('#st-generate');
+  await page.selectOption('#st-pattern', 'jaws@2');
+  await page.fill('#st-count', '2');
+  await page.click('#st-start');
+  // while the batch runs: the header button watches the video being made right now
+  await expect(page.locator('#st-live')).toHaveText('● Watch live', { timeout: 60000 });
+  await expect(page.locator('#st-batch')).toContainText('Running batch');
+  await page.click('#st-live');
+  await expect(page.locator('#hud-live')).toContainText('LIVE · video 1 of 2');
+  await page.waitForFunction(() => window.__splitChamber.state.shown > 60, null, { timeout: 30000 });
+  expect(await page.evaluate(() => window.__splitChamber.state.session.meta.scenario)).toBe('jaws@2');
+  await page.keyboard.press('Escape');            // pause
+  await page.click('#btn-menu1');                 // leaves the live view: back to the Studio
+  await expect(page.locator('#studio')).toBeVisible();
+  await expect(page.locator('#st-job')).toBeHidden({ timeout: 10 * 60 * 1000 });
+
+  const all = statuses(lib);
+  expect(all.length).toBe(2);
+  expect(new Set(all.map((s) => s.batch && s.batch.id)).size).toBe(1);
+  expect(all.every((s) => Array.isArray(s.checks) && s.checks.length >= 6)).toBe(true);
+  const review = all.filter((s) => s.status === 'candidate').length, rejected = all.filter((s) => s.status === 'rejected').length;
+  await expect(page.locator('#st-batch')).toContainText('Last batch');
+  await expect(page.locator('#st-batch .chip.review b')).toHaveText(String(review));
+  await expect(page.locator('#st-batch .chip.bad b').first()).toHaveText(String(rejected));
+  await expect(page.locator('#st-live')).toHaveText('Live play');
+
+  // the selected video explains every check and its score
+  await page.click(review ? '#st-tab-review' : '#st-tab-rejected');
+  await page.locator('#st-grid .card').first().click();
+  await expect(page.locator('#st-actions .st-why')).toContainText('Why');
+  await expect(page.locator('#st-actions .st-why')).toContainText('Hook (first split)');
+  if (review) await expect(page.locator('#st-actions .st-why')).toContainText('Score');
+  expect(errors).toEqual([]);
+  await app.close();
+});
+
 test('CLI: tiny quota stops the batch with a clear message and no partial files', () => {
   const lib = tmp('quota');
   const r = cli(lib, ['--generate=2', '--pattern=split-chamber@2', '--seeds=11,12', '--quota-mb=1']);

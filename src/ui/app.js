@@ -91,10 +91,28 @@ function newSeed() {
 }
 
 function play(seed = newSeed()) {
+  state.watch = null; $('hud-live').classList.add('hidden');
+  playConfig(getScenario(state.scenarioKey || DEFAULT_SCENARIO).generate(seed), $('opt-keep').checked);
+}
+
+/** Watch the video the factory is making right now: the same config, simulated again here in real time
+ *  (deterministic, so it is frame-for-frame the video being rendered). Follows the batch to the next video. */
+function watchLive(ev, open) {
+  if (!open && !state.watch) return;
+  if (state.watch && state.watch.id === ev.id && state.mode === 'play') return;
+  state.watch = ev;
+  $('studio').classList.add('hidden');
+  const b = ev.batch;
+  $('hud-live').textContent = `● LIVE · ${b ? `video ${b.index + 1} of ${b.total} · ` : ''}${ev.label} · seed ${ev.seed}`;
+  $('hud-live').classList.remove('hidden');
+  playConfig(ev.config, false);
+}
+
+function playConfig(config, keep) {
+  const seed = config.seed;
   stopWorker();
   ensureAudio();
-  state.keep = $('opt-keep').checked;
-  const config = getScenario(state.scenarioKey || DEFAULT_SCENARIO).generate(seed);
+  state.keep = keep;
   useRendererFor(config);
   state.session = { meta: { seed, capFrame: -1, outroFrame: -1, endFrame: -1, frameCount: -1, scenario: config.scenario, config }, frames: [], complete: false, saved: false };
   const w = new Worker(new URL('../sim/sim.worker.js', import.meta.url), { type: 'module' });
@@ -137,6 +155,7 @@ function pause(on) {
 }
 
 function toMenu() {
+  if (state.watch) { toStudio(); return; }
   stopWorker();
   state.mode = 'menu'; state.paused = false;
   if (state.audio) state.audio.suspend();
@@ -193,6 +212,12 @@ async function finish() {
   $('btn-replay').classList.toggle('hidden', !exportable);
   $('btn-save').classList.add('hidden');
   $('end-session').textContent = exportable ? '' : 'Session was not kept (turn on "Keep session" in the menu to export).';
+  if (state.watch) {
+    $('end-title').textContent = 'Live video finished';
+    $('end-session').textContent = 'The factory is checking this video. When it starts the next one, this view follows it automatically.';
+  }
+  $('btn-again').classList.toggle('hidden', !!state.watch);
+  $('btn-menu2').textContent = state.watch ? '← Back to Studio' : 'Main menu';
   show('end');
   if (exportable && wasPlay && !s.saved) await saveSession();
 }
@@ -285,7 +310,7 @@ $('btn-play').onclick = () => play();
 $('btn-open').onclick = openSession;
 $('btn-folder').onclick = () => host.show(null);
 // Exit from live play returns to the Studio home (the app itself closes with the window's X).
-function toStudio() { stopWorker(); state.mode = 'menu'; if (state.audio) state.audio.suspend(); show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); else host.quit(); }
+function toStudio() { state.watch = null; $('hud-live').classList.add('hidden'); $('btn-again').classList.remove('hidden'); $('btn-menu2').textContent = 'Main menu'; stopWorker(); state.mode = 'menu'; if (state.audio) state.audio.suspend(); show(null); $('hud').classList.add('hidden'); if (studio) studio.show(); else host.quit(); }
 $('btn-exit').onclick = toStudio;
 const PATTERN_DESC = {
   'split-chamber': 'One ball. Four presses. Every hit splits it in three — until there are ten thousand.',
@@ -323,7 +348,7 @@ window.addEventListener('keydown', (e) => {
   if (!$('studio').classList.contains('hidden')) return; // the Studio home has its own shortcuts
   const playing = state.mode === 'play' || state.mode === 'replay';
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(!state.paused); else if (state.mode === 'menu') play(); }
-  else if (e.code === 'KeyR' && (playing || state.mode === 'ended')) play();
+  else if (e.code === 'KeyR' && !state.watch && (playing || state.mode === 'ended')) play();
   else if (e.code === 'Escape') { if (playing && !state.paused) pause(true); else if (state.mode === 'menu') toStudio(); else if (state.mode !== 'export') toMenu(); }
   else if (e.code === 'KeyF') host.fullscreen();
   else if (e.code === 'KeyE' && state.mode === 'ended' && !$('btn-export').classList.contains('hidden')) doExport();
@@ -354,7 +379,7 @@ async function boot() {
   if (!info.bench && !info.gate) {
     const sinfo = await host.studio.info();
     if (sinfo.cli) { runCli(sinfo.cli, sinfo.debug).catch((e) => host.studio.cliDone({ ok: false, error: e.message })); return; }
-    studio = createStudio({ onLivePlay: () => { state.mode = 'menu'; show('menu'); }, toast });
+    studio = createStudio({ onLivePlay: () => { state.mode = 'menu'; show('menu'); }, onWatch: watchLive, toast });
     show(null);
     await studio.init();
     studio.show();

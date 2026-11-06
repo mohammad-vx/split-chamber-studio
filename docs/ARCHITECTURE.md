@@ -333,3 +333,5 @@ Each layer declares `lookbackFrames`. In v1 these are rings 20, impacts 12, coun
 | Pacing by fixed probabilities | Pacing controller (split chance from count vs target curve) | Exponential growth had 7 s … never seed variance; controller lands climaxes within ≈ 1 s |
 | Deterministic across runtimes | New engines bit-identical Node == Electron (dmath, counter RNG); legacy @1 exact only within Electron | V8 Math.* differs in last bits between Node 24 and Electron 45 |
 | Long multi-act mode, claw/gantry | Not implemented | Out of time budget; listed as next steps |
+
+- **Contact pinch rule (2026-11-06, owner feedback).** The packed/machine families moved to @2: a ball squeezed between a moving part and an opposing surface always splits; the pacing probability no longer applies to them (it still drives split-chamber@2 and orbit-crusher@1). The climax is "arena full or 40 s"; a climax-size check (>= 50 %) replaces the probability as the guard against weak runs. Details and measurements: docs/PROGRESS.md, Step 7.

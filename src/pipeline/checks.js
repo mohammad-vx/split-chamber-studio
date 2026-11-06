@@ -11,37 +11,62 @@ export const LIMITS = {
   quality: { ssimMin: 0.94, ssimMean: 0.96 },
 };
 
-export function checkRun(config, s) {
-  const r = [];
-  if (s.nonFinite) r.push('unstable simulation (non-finite positions)');
-  if (!s.completed) r.push('simulation did not reach its ending');
+// Every check is reported as an explanation row { stage, name, value, limit, ok, reason } so the Studio can
+// show WHY a video was accepted into review or rejected. check*() return just the failure reasons.
+const row = (stage, name, value, limit, ok, reason) => ({ stage, name, value, limit, ok: !!ok, reason: ok ? '' : reason });
+
+export function explainRun(config, s) {
+  const out = [];
   const d = config.duration;
-  if (d && (s.durationS < d.minS || s.durationS > d.maxS)) r.push(`duration ${s.durationS.toFixed(1)} s outside ${d.minS}–${d.maxS} s`);
-  if (s.hookFrame < 0 || s.hookFrame / FPS > LIMITS.hookMaxS) r.push(`no hook: first split at ${s.hookFrame < 0 ? 'never' : (s.hookFrame / FPS).toFixed(1) + ' s'} (limit ${LIMITS.hookMaxS} s)`);
-  if (s.capFrame < 0) r.push('no climax (ball cap never reached)');
+  out.push(row('simulation', 'Stable physics', s.nonFinite ? 'invalid numbers' : 'ok', 'no invalid numbers', !s.nonFinite, 'unstable simulation (non-finite positions)'));
+  out.push(row('simulation', 'Reaches its ending', s.completed ? 'yes' : 'no', 'must finish', s.completed, 'simulation did not reach its ending'));
+  if (d) out.push(row('simulation', 'Length', `${s.durationS.toFixed(1)} s`, `${d.minS}–${d.maxS} s`, s.durationS >= d.minS && s.durationS <= d.maxS, `duration ${s.durationS.toFixed(1)} s outside ${d.minS}–${d.maxS} s`));
+  const hookOk = s.hookFrame >= 0 && s.hookFrame / FPS <= LIMITS.hookMaxS;
+  out.push(row('simulation', 'Hook (first split)', s.hookFrame < 0 ? 'never' : `${(s.hookFrame / FPS).toFixed(1)} s`, `≤ ${LIMITS.hookMaxS} s`, hookOk,
+    `no hook: first split at ${s.hookFrame < 0 ? 'never' : (s.hookFrame / FPS).toFixed(1) + ' s'} (limit ${LIMITS.hookMaxS} s)`));
+  out.push(row('simulation', 'Climax', s.capFrame < 0 ? 'never' : `at ${(s.capFrame / FPS).toFixed(1)} s`, 'must happen', s.capFrame >= 0, 'no climax (ball cap never reached)'));
+  const fillMin = config.checks && config.checks.climaxFillMin;
+  const world2 = config.machine || config.packed;
+  if (fillMin && world2 && s.capFrame >= 0) {
+    const fill = (s.timeline.n[s.capFrame] || 0) / world2.maxBalls;
+    out.push(row('simulation', 'Climax size', `${Math.round(fill * 100)} % of ${world2.maxBalls} balls`, `≥ ${Math.round(fillMin * 100)} %`, fill >= fillMin,
+      `climax too small: ${Math.round(fill * 100)} % of the ${world2.maxBalls} balls when time ran out (minimum ${Math.round(fillMin * 100)} %)`));
+  }
   const world = config.orbit || config.packed || {};
   const ballR = world.ballR || 6.5, arenaR = (world.arena && world.arena.r) || 460;
   const coverageMin = (config.checks && config.checks.coverageMin) || LIMITS.coverageMin;
   const half = s.timeline.n[Math.floor(s.frameCount / 2)] || 0;
   const coverage = Math.min(1, half * ballR * ballR / (arenaR * arenaR));
-  if (coverage < coverageMin) r.push(`scene too empty at half time (coverage ${(coverage * 100).toFixed(1)} %, minimum ${(coverageMin * 100).toFixed(1)} %)`);
-  return r;
+  out.push(row('simulation', 'Scene filled at half time', `${(coverage * 100).toFixed(1)} %`, `≥ ${(coverageMin * 100).toFixed(1)} %`, coverage >= coverageMin,
+    `scene too empty at half time (coverage ${(coverage * 100).toFixed(1)} %, minimum ${(coverageMin * 100).toFixed(1)} %)`));
+  return out;
 }
 
-export function checkAudio(a) {
-  const r = [];
-  if (!(a.lufs >= LIMITS.lufs[0] && a.lufs <= LIMITS.lufs[1])) r.push(`loudness ${a.lufs} LUFS outside ${LIMITS.lufs[0]}…${LIMITS.lufs[1]}`);
-  if (!(a.truePeak <= LIMITS.truePeakMax)) r.push(`true peak ${a.truePeak} dBTP above ${LIMITS.truePeakMax}`);
-  if (a.longestSilence >= LIMITS.silenceMaxS) r.push(`silence of ${a.longestSilence.toFixed(1)} s`);
-  return r;
+export function explainAudio(a) {
+  return [
+    row('preview', 'Loudness', `${a.lufs} LUFS`, `${LIMITS.lufs[0]}…${LIMITS.lufs[1]} LUFS`, a.lufs >= LIMITS.lufs[0] && a.lufs <= LIMITS.lufs[1], `loudness ${a.lufs} LUFS outside ${LIMITS.lufs[0]}…${LIMITS.lufs[1]}`),
+    row('preview', 'True peak', `${a.truePeak} dBTP`, `≤ ${LIMITS.truePeakMax} dBTP`, a.truePeak <= LIMITS.truePeakMax, `true peak ${a.truePeak} dBTP above ${LIMITS.truePeakMax}`),
+    row('preview', 'No silence gaps', `${a.longestSilence.toFixed(1)} s`, `< ${LIMITS.silenceMaxS} s`, a.longestSilence < LIMITS.silenceMaxS, `silence of ${a.longestSilence.toFixed(1)} s`),
+  ];
 }
 
-export function checkVideo(v) {
-  const r = [];
-  if (v.longestFreeze > LIMITS.freezeMaxS) r.push(`picture frozen for ${v.longestFreeze.toFixed(1)} s`);
-  if (v.longestBlack > 0) r.push(`black picture for ${v.longestBlack.toFixed(1)} s`);
-  return r;
+export function explainVideo(v) {
+  return [
+    row('preview', 'Picture never freezes', `${v.longestFreeze.toFixed(1)} s`, `≤ ${LIMITS.freezeMaxS} s`, v.longestFreeze <= LIMITS.freezeMaxS, `picture frozen for ${v.longestFreeze.toFixed(1)} s`),
+    row('preview', 'No black picture', `${v.longestBlack.toFixed(1)} s`, '0 s', !(v.longestBlack > 0), `black picture for ${v.longestBlack.toFixed(1)} s`),
+  ];
 }
+
+export function explainDuplicate(dup) {
+  const n = dup.nearest;
+  return row('preview', 'Different from accepted videos', n ? `closest ${n.id}: curve ${n.curve.toFixed(3)}, frames ${n.hamming.toFixed(1)}` : 'no accepted videos yet',
+    `not both curve < ${LIMITS.dupCurve} and frames < ${LIMITS.dupHamming}`, !dup.duplicate, n ? `too similar to accepted video ${n.id}` : '');
+}
+
+const fails = (rows) => rows.filter((r) => !r.ok).map((r) => r.reason);
+export function checkRun(config, s) { return fails(explainRun(config, s)); }
+export function checkAudio(a) { return fails(explainAudio(a)); }
+export function checkVideo(v) { return fails(explainVideo(v)); }
 
 export function checkQuality(q) {
   const r = [];
@@ -79,14 +104,27 @@ export function findDuplicate(desc, accepted) {
   return { duplicate: !!dup, nearest: best };
 }
 
-/** Ranking score 0–100 (used for sorting and, later, automatic selection). */
+/** Ranking score 0–100 (sorting, auto-accept) with its breakdown: base 50 + four bonuses. */
+export function scoreParts(config, s, audio, nearest) {
+  const hook = s.hookFrame / FPS;
+  const d = config.duration, mid = d ? (d.minS + d.maxS) / 2 : s.durationS;
+  const parts = [
+    { name: 'Base', points: 50, max: 50, note: '' },
+    { name: 'Early hook', points: Math.max(0, 15 - hook * 6), max: 15, note: `first split at ${hook.toFixed(1)} s` },
+    { name: 'Comfortable length', points: Math.max(0, 10 - Math.abs(s.durationS - mid)), max: 10, note: `${s.durationS.toFixed(1)} s, ideal ${mid.toFixed(0)} s` },
+    { name: 'Loudness on target', points: audio ? Math.max(0, 10 - Math.abs(audio.lufs + 14) * 4) : 0, max: 10, note: audio ? `${audio.lufs} LUFS, target −14` : 'not measured' },
+    { name: 'Novelty', points: nearest ? Math.min(15, nearest.score / 2) : 15, max: 15, note: nearest ? `distance ${nearest.score.toFixed(1)} from ${nearest.id}` : 'nothing accepted yet' },
+  ].map((p) => ({ ...p, points: Math.round(p.points * 10) / 10 }));
+  return parts;
+}
+
 export function score(config, s, audio, nearest) {
   let sc = 50;
   const hook = s.hookFrame / FPS;
-  sc += Math.max(0, 15 - hook * 6);                                   // early hook
+  sc += Math.max(0, 15 - hook * 6);
   const d = config.duration, mid = d ? (d.minS + d.maxS) / 2 : s.durationS;
-  sc += Math.max(0, 10 - Math.abs(s.durationS - mid));                // comfortable length
-  if (audio) sc += Math.max(0, 10 - Math.abs(audio.lufs + 14) * 4);   // on-target loudness
-  sc += nearest ? Math.min(15, nearest.score / 2) : 15;              // novelty vs accepted
+  sc += Math.max(0, 10 - Math.abs(s.durationS - mid));
+  if (audio) sc += Math.max(0, 10 - Math.abs(audio.lufs + 14) * 4);
+  sc += nearest ? Math.min(15, nearest.score / 2) : 15;
   return Math.round(Math.max(0, Math.min(100, sc)));
 }

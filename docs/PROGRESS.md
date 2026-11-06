@@ -82,3 +82,31 @@ Autonomous implementation of docs/ARCHITECTURE.md (owner approved, owner away). 
 - Packaging: `dist/SplitChamberStudio-2.0.0-portable.exe` and `-setup.exe`; the packaged app generated and
   accepted a rams@1 video in 122 s (bundled ffmpeg/ffprobe/MediaBunny all working from the package).
 - Sustained benchmark: 4/4 videos accepted in 410 s (≈ 100 s per finished video). `docs/BENCHMARK.md`.
+
+## Step 7 — owner feedback after first use (2026-11-06)
+
+Feedback: (1) a ball squeezed between a moving part and a fixed one must split, not wait to be hit by other
+balls; (2) explain how a video is accepted or rejected; (3) Live play should show what the factory is making
+now; (4) after a batch, show clearly how many went to review and how many were rejected, and why.
+
+- **Contact pinch rule (`pinchRule: 'contact'`, engines `packed.js` and `machines.js`).** Measured on the
+  owner's last video (rotary-sweeper@1 seed 230982): 700 splits vs 9,305 pinches that did *not* split (93 %),
+  because the split was decided by the pacing probability, and most splits came from the "arm ploughing a
+  compressed pile" rule. In v2 a ball squeezed between a moving part and an opposing surface splits on the
+  first substep, always; a push through a pile only ejects. @1 behaviour is untouched (gate: all @1 goldens OK).
+- **New versions** `rotary-sweeper@2`, `jaws@2`, `rams@2`, `kaleidoscope@2`, `walls@2` (`src/scenarios/contact-v2.js`):
+  v1 layout from the same seed + deterministic changes. Without the probability, growth is shaped by the
+  mechanism: jaws split into 2; rams cycles 1.2× slower; kaleidoscope cycle fixed at ≈ 4.5 s with gravity;
+  rotary arms at ≈ 2.2 rad/s (whole beats) with 12 px balls. The finale starts when the arena is full or at
+  40 s; length 30–50 s; new check *climax size ≥ 50 %*. @1 versions stay registered (reproducible) but unlisted.
+- **Validation (`tools/scenario-check.mjs`, seeds 200–223):** jaws 24/24, rams 24/24, kaleidoscope 24/24,
+  walls 24/24, rotary 15/24 (4 climax too small, 5 too short). Rejections cost ≈ 3 s (right after simulating).
+- **Explanations.** Every check is now an explanation row (`explainRun/Audio/Video/Duplicate` in `checks.js`;
+  rejection reasons unchanged), stored per video with the score breakdown (`scoreParts`). The side panel shows
+  ✓/✗, the measured value and the limit. A "How it works" dialog describes the whole flow.
+- **Batch summary.** Each video records `batch {id, index, total, pattern}`; the "Last batch" panel shows
+  requested / waiting for review / accepted / rejected by checks (grouped reasons) / rejected by you / failed /
+  not made, with a "Last batch only" filter.
+- **Watch live.** While a batch runs, the header button becomes "● Watch live": the same config is simulated
+  again in real time and drawn (deterministic → the same frames being rendered); it follows the batch to the
+  next video. Without a batch, Live play opens the game with all 7 patterns.

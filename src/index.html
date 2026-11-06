@@ -12,6 +12,7 @@
     <canvas id="stage" aria-label="Simulation"></canvas>
 
     <div id="hud" class="hidden">
+      <span id="hud-live" class="pill hidden"></span>
       <span id="hud-session" class="pill"><i></i>Session kept for export</span>
       <span id="hud-hint">Space pause · R restart · Esc menu</span>
     </div>
@@ -100,6 +101,7 @@
         <div><h1>Split Chamber Studio</h1><div class="st-quota"><div class="bar"><div id="st-quota-bar"></div></div><span id="st-quota"></span></div></div>
       </div>
       <div class="st-buttons">
+        <button id="st-help" class="ghost">How it works</button>
         <button id="st-live" class="ghost">Live play</button>
         <button id="st-generate" class="primary">+ Generate</button>
       </div>
@@ -116,8 +118,10 @@
     <div id="st-job" class="st-job hidden">
       <div><strong id="st-job-label"></strong> <span id="st-job-stage" class="muted"></span></div>
       <div class="bar"><div id="st-job-progress"></div></div>
+      <button id="st-watch" class="ghost">● Watch live</button>
       <button id="st-cancel">Stop</button>
     </div>
+    <div id="st-batch" class="st-batch hidden"></div>
     <nav class="st-tabs">
       <button id="st-tab-review" class="on">Waiting for review <b>0</b></button>
       <button id="st-tab-accepted">Accepted <b>0</b></button>
@@ -125,6 +129,7 @@
     </nav>
     <div class="st-filters">
       <select id="st-filter-pattern"><option value="">All patterns</option></select>
+      <select id="st-filter-batch"><option value="">All batches</option><option value="last">Last batch only</option></select>
       <select id="st-sort"><option value="score">Best score</option><option value="new">Newest</option><option value="duration">Longest</option></select>
       <input id="st-search" type="text" placeholder="Seed or id">
       <span id="st-stats" class="muted small"></span>
@@ -133,6 +138,20 @@
       <div id="st-grid" class="st-grid"></div>
       <aside id="st-actions" class="st-actions"></aside>
     </div>
+    <dialog id="st-howto" class="st-howto">
+      <h2>How a video is made, checked, accepted or rejected</h2>
+      <ol>
+        <li><b>Design.</b> The pattern you chose (or a random one) builds a machine from the video's <i>seed</i>: part sizes, speeds, tempo, gravity, colours. The same seed always gives the same video.</li>
+        <li><b>Simulate.</b> The physics runs in the background, frame by frame (no picture yet). Every ball squeezed between a moving part and a wall or another part splits. When the arena is full, or the time limit is reached, the gold finale starts.</li>
+        <li><b>Simulation checks</b> (about 3 s, cheap). Rejected immediately if: physics unstable · no ending · length outside the pattern's range · first split later than 3 s · climax too small · scene too empty at half time.</li>
+        <li><b>Soundtrack and preview.</b> Music and impact sounds are generated in sync with the frames, and a small 540×960 preview is rendered.</li>
+        <li><b>Preview checks</b> on the real file: loudness −17…−13 LUFS · true peak ≤ −1 dBTP · no silence over 1.5 s · no frozen or black picture over 1 s · not too similar to a video you already accepted.</li>
+        <li><b>Waiting for review.</b> A video that passes every check gets a <b>score</b> (base 50 + early hook + comfortable length + loudness + novelty) and waits for you. Nothing is accepted without you, unless you turned on <i>Auto-accept score ≥ N</i>.</li>
+        <li><b>You decide.</b> <b>Accept</b> renders the full 1080×1920 · 60 fps master, re-runs the simulation to prove every frame is identical, and checks picture quality (SSIM) and loudness again. <b>Reject</b> deletes the media and keeps a small record with your reason.</li>
+      </ol>
+      <p class="muted small">Select any video to see every check it went through, with the measured value and the limit, and how its score was calculated.</p>
+      <button id="st-howto-close">Close</button>
+    </dialog>
     <dialog id="st-player">
       <video id="st-video" controls playsinline></video>
       <p id="st-player-info" class="muted small"></p>
