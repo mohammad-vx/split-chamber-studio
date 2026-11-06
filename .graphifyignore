@@ -1,0 +1,10 @@
+baseline/
+docs/media/
+test-results/
+dist/
+node_modules/
+graphify-out/
+*.png
+*.jpg
+*.mp4
+*.json
