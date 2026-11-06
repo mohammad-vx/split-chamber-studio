@@ -150,3 +150,11 @@ now; (4) after a batch, show clearly how many went to review and how many were r
   parallel to a fixed one, one ball apart (hammer head over a V bowl, upper jaw over a lower jaw), or a head whose
   path is concentric with the rim (fist). Flat tops trap balls (they ride the hammer): roofs must slope.
 - Validation, default controls, seeds 300–311: croc-jaws 11/12, hammer-bowl 11/12, fist-arm 7/12.
+
+## Step 11 — Phase 2 station 3: Shears Fan, Fan Blades, Laser Spin (2026-11-06)
+
+- Shears Fan: blades start 260 px from the pin (a narrow wedge near the pin split everything inside it at once);
+  a cradle concentric with the pin keeps every tip one ball from it. Fan Blades: hinged at the centre so the arcs run
+  along the rim. Laser Spin: pulled to the centre, where the planetary laser passes.
+- Validation, default controls, seeds 300–311: laser-spin 12/12, shears-fan 10/12, fan-blades 10/12.
+- Claw Machine (registered, unlisted): a claw with two fingers pinches too little per grab (≤ 17 % of the target).

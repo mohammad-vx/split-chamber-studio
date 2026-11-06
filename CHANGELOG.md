@@ -4,6 +4,12 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 2.5.0 — 2026-11-06 · Phase 2, station 3
+- Three more machines: **Shears Fan** (3–5 blades on one pin above the arena open and shut over a cradle),
+  **Fan Blades** (two sector blades swing out against the rim and back together), **Laser Spin** (a laser bar on a
+  planetary carrier, pulled to the centre, past fixed pegs).
+- Claw Machine is built but not offered yet: it still grows too slowly.
+
 ## 2.4.0 — 2026-11-06 · Phase 2, station 2
 - Three new machines built on the part tree: **Crocodile Jaws** (a toothed upper jaw hinged on the rim snaps onto a
   fixed lower jaw), **Fist Arm** (two arms with elbows punch against the rim), **Hammer & Bowl** (a drop hammer from
