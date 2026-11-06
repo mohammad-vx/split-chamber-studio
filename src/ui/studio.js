@@ -119,7 +119,7 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     el.tabIndex = 0;
     const thumb = it.thumb ? `<img src="lib://library/videos/${it.id}/${it.thumb}" alt="">` : `<div class="noimg">${it.status}</div>`;
     const reasons = (it.reasons || []).slice(0, 2).map((r) => `<li>${r}</li>`).join('');
-    el.innerHTML = `${thumb}<div class="meta"><strong>${it.label || it.scenario}</strong>
+    el.innerHTML = `${thumb}<div class="meta">${it.invented ? '<span class="badge-invented">✦ Invented</span>' : ''}<strong>${it.label || it.scenario}</strong>
       <span>seed ${it.seed}${it.durationS ? ` · ${it.durationS.toFixed(1)} s` : ''}${it.score != null ? ` · score ${it.score}` : ''}</span>
       ${it.capN ? `<span>finale at ${it.capN.toLocaleString('en-US')} balls · ${it.capS.toFixed(1)} s</span>` : ''}
       ${it.controls ? `<span class="cap">gravity ${it.controls.gravity} · ${it.controls.length} · ${it.controls.ending}</span>` : ''}
@@ -255,7 +255,8 @@ export function createStudio({ onLivePlay, onWatch, toast }) {
     await run(`Generating ${count} video${count > 1 ? 's' : ''}`, async () => {
       const autoAcceptScore = $('st-auto').checked ? Number($('st-auto-score').value) : null;
       const controls = { gravity: $('st-gravity').value, target: $('st-target').value === 'max' ? 'max' : Number($('st-target').value), length: $('st-length').value, ending: $('st-ending').value };
-      const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, controls, owner: 'ui' });
+      const seeds = window.__splitChamber && window.__splitChamber.testSeeds;   // e2e tests pin seeds so results are reproducible
+      const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, controls, owner: 'ui', ...(seeds ? { seeds } : {}) });
       const ok = res.filter((r) => r.status === 'candidate').length, accd = res.filter((r) => r.status === 'accepted').length;
       const rej = res.filter((r) => r.status === 'rejected').length, fail = res.length - ok - accd - rej;
       toast(`Batch finished (${count} requested): ${ok} waiting for review${accd ? `, ${accd} auto-accepted` : ''}, ${rej} rejected by the checks${fail ? `, ${fail} failed` : ''}${res.length < count ? `, ${count - res.length} not made` : ''}.`, 9000);

@@ -130,3 +130,15 @@ now; (4) after a batch, show clearly how many went to review and how many were r
   length (medium/long = smaller balls + slower machine, extra slowing for fast growers), ending.
 - **Validation, default controls, seeds 300–311:** jaws 12/12, rams 12/12, orbit 12/12, rotary 11/12, laser 10/12,
   walls 10/12, split 9/12. Medium length spot-checks: jaws 5/5; long length is the least reliable (≈ 60 %).
+
+## Step 9 — Phase 2 station 1: engine modules and the part tree (2026-11-06)
+
+- `src/engine/machines.js` is now the `MachineSim` loop only; the rest lives in `src/engine/machine/`:
+  `kinematics.js` (poses, part tree, morphing shapes, polygon edges), `mechanisms.js` (closed-form mechanisms),
+  `collide.js` (ball ↔ part / arena), `pinch.js` (the split rule), `ending.js` (forces, finale, gold wave, break),
+  `measure.js` (balls inside solid parts). Same arithmetic in the same order: 39/39 goldens and the gate pass.
+- Part tree: `parent: k` puts a part in part k's frame (parents first, checked by `validateTree`). The renderer and
+  the sim use the same `partPose(p, t, parts)`.
+- `tools/snap.mjs` dumps balls and parts at chosen times (for a quick look while tuning a machine).
+- The batch-summary e2e test pins seeds through `window.__splitChamber.testSeeds` and counts the same buckets as
+  the panel (it was flaky with random seeds).

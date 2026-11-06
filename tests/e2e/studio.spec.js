@@ -94,6 +94,7 @@ test('UI: batch summary, live view of the running video, and per-video explanati
   await page.click('#st-generate');
   await page.selectOption('#st-pattern', 'jaws@2');
   await page.fill('#st-count', '2');
+  await page.evaluate(() => { window.__splitChamber.testSeeds = [301, 302]; });   // fixed seeds: same outcome every run
   await page.click('#st-start');
   // while the batch runs: the header button watches the video being made right now
   await expect(page.locator('#st-live')).toHaveText('● Watch live', { timeout: 60000 });
@@ -111,7 +112,10 @@ test('UI: batch summary, live view of the running video, and per-video explanati
   expect(all.length).toBe(2);
   expect(new Set(all.map((s) => s.batch && s.batch.id)).size).toBe(1);
   expect(all.every((s) => Array.isArray(s.checks) && s.checks.length >= 6)).toBe(true);
-  const review = all.filter((s) => s.status === 'candidate').length, rejected = all.filter((s) => s.status === 'rejected').length;
+  expect(all.map((s) => s.seed).sort()).toEqual([301, 302]);
+  // the same buckets the panel uses: review = candidate or mastering, auto-rejected = rejected by the checks
+  const review = all.filter((s) => s.status === 'candidate' || s.status === 'mastering').length;
+  const rejected = all.filter((s) => s.status === 'rejected' && s.rejectedAt !== 'review').length;
   await expect(page.locator('#st-batch')).toContainText('Last batch');
   await expect(page.locator('#st-batch .chip.review b')).toHaveText(String(review));
   await expect(page.locator('#st-batch .chip.bad b').first()).toHaveText(String(rejected));

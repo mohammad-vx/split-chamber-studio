@@ -156,7 +156,9 @@ test('every pattern can be played live', async () => {
   await page.click('#btn-ex-done').catch(() => {});
   if (!(await page.isVisible('#menu'))) await page.click('#btn-menu2');
   const keys = await page.$$eval('#opt-pattern option', (os) => os.map((o) => o.value));
-  expect(keys.length).toBe(7);
+  const { pathToFileURL } = require('node:url');   // as many as the registry offers (grows with every new machine)
+  const { listedScenarios } = await import(pathToFileURL(path.join(ROOT, 'src', 'scenarios', 'index.js')).href);
+  expect(keys).toEqual(listedScenarios().map((s) => s.key));
   for (const key of keys) {
     await page.selectOption('#opt-pattern', key);
     await page.click('#btn-play');

@@ -1,7 +1,7 @@
 // Renderer for the generic machine engine: any capsule / circle / convex-polygon parts drawn in the Split Chamber
 // metal style from their scripted poses, plus a breakable glass rim and the peak counter.
 import { Renderer, mkCanvas, roundRect } from './renderer.js';
-import { partPose } from '../engine/machines.js';
+import { partPose, partShape } from '../engine/machines.js';
 import { FPS } from '../core/constants.js';
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -84,9 +84,21 @@ export class MachineRenderer extends Renderer {
   drawPistons(t) {
     const g = this.ctx, o = this.opts, { cx, cy, r } = o.arena;
     const pivots = new Set();
-    g.save(); g.beginPath(); g.arc(cx, cy, r + 1, 0, Math.PI * 2); g.clip();   // parts live inside the chamber
-    o.parts.forEach((p, k) => {
-      const pose = partPose(p, t), sp = this.sprites[k];
+    // parts live inside the chamber; parts marked `outside` (a shaft coming in from above) are drawn unclipped
+    g.save(); g.beginPath(); g.arc(cx, cy, r + 1, 0, Math.PI * 2); g.clip();
+    const order = o.parts.map((p, k) => k).sort((a, b) => (o.parts[a].outside ? 1 : 0) - (o.parts[b].outside ? 1 : 0));
+    let clipped = true;
+    order.forEach((k) => {
+      const p = o.parts[k];
+      if (p.outside && clipped) { g.restore(); g.save(); clipped = false; }
+      const pose = partPose(p, t, o.parts), sp = this.sprites[k];
+      if (p.morph) {                                 // a shape that changes (claw → cage): drawn as a live polygon
+        const pts = partShape(p, t), c = Math.cos(pose.a), s = Math.sin(pose.a);
+        g.beginPath();
+        pts.forEach(([lx, ly], i) => { const x = pose.x + lx * c - ly * s, y = pose.y + lx * s + ly * c; if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+        g.closePath(); g.fillStyle = '#a7afba'; g.fill(); g.strokeStyle = 'rgba(18,22,28,0.7)'; g.lineWidth = 1.5; g.stroke();
+        return;
+      }
       if (sp.circle) {
         const c = Math.cos(pose.a), s = Math.sin(pose.a);
         const x = pose.x + p.at[0] * c - p.at[1] * s, y = pose.y + p.at[0] * s + p.at[1] * c;
