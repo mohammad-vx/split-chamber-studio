@@ -6,6 +6,14 @@ https://github.com/user-attachments/assets/40776ce7-33b2-4495-8a53-636f7ce657af
 
 
 
+### What's new in 3.2 (40 s, with sound)
+
+[![What's new in Split Chamber Studio 3.2](docs/media/promo-3.2-poster.jpg)](docs/media/promo-3.2.mp4)
+
+Six new machines built from parts mounted on parts · **✦ Invent**: machines the app designs by itself, now tuned so
+9 in 10 pass the checks · every rejected video keeps a picture, replays live and can be accepted anyway ·
+**★ Save as pattern** for the inventions you love.
+
 A desktop tool that **generates satisfying ball-simulation videos automatically**. You choose a pattern, how many videos you want and the caption language, then press **Generate**. Every video is:
 
 - simulated deterministically, so it can be reproduced exactly from its seed;
