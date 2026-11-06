@@ -4,6 +4,11 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.1.1 — 2026-11-06
+- Fix: thumbnails and previews could stay blank in the installed app (the library file handler was registered only
+  after the startup recovery pass). It is now registered first, and a failing recovery is logged instead of
+  blocking the library.
+
 ## 3.1.0 — 2026-11-06 · Inventor: pre-check, novelty, saved machines
 - Pre-check: every invented machine is simulated for 12 s first; a machine that stalls or runs away is replaced by
   another variant of the same seed (up to 6, same family first). Pass rate 42 % → 62 % (24 seeds), with all three
