@@ -142,3 +142,11 @@ now; (4) after a batch, show clearly how many went to review and how many were r
 - `tools/snap.mjs` dumps balls and parts at chosen times (for a quick look while tuning a machine).
 - The batch-summary e2e test pins seeds through `window.__splitChamber.testSeeds` and counts the same buckets as
   the panel (it was flaky with random seeds).
+
+## Step 10 — Phase 2 station 2: Crocodile Jaws, Fist Arm, Hammer & Bowl (2026-11-06)
+
+- Lesson from tuning: with the contact rule a split needs a ball between a moving part and a *solid* surface, so a
+  machine grows only as fast as the length of its pinch lines. Designs that worked: a moving surface that runs
+  parallel to a fixed one, one ball apart (hammer head over a V bowl, upper jaw over a lower jaw), or a head whose
+  path is concentric with the rim (fist). Flat tops trap balls (they ride the hammer): roofs must slope.
+- Validation, default controls, seeds 300–311: croc-jaws 11/12, hammer-bowl 11/12, fist-arm 7/12.

@@ -4,6 +4,11 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 2.4.0 — 2026-11-06 · Phase 2, station 2
+- Three new machines built on the part tree: **Crocodile Jaws** (a toothed upper jaw hinged on the rim snaps onto a
+  fixed lower jaw), **Fist Arm** (two arms with elbows punch against the rim), **Hammer & Bowl** (a drop hammer from
+  above the arena falls into a V bowl).
+
 ## 2.3.0 — 2026-11-06 · Phase 2, station 1
 - Machine engine split into modules (`src/engine/machine/`: kinematics, mechanisms, collide, pinch, ending, measure);
   every older video still reproduces byte for byte (all 39 goldens + the gate).

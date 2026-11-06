@@ -79,3 +79,15 @@ test('a machine with mounted parts runs deterministically and splits balls', () 
   assert.ok(a[1] > 1, `peak ${a[1]}`);
 });
 
+test('phase-2 machines: listed, on the contact rule, deterministic, and they split', async () => {
+  const { getScenario, listedScenarios } = await import('../../src/scenarios/index.js');
+  const { applyControls } = await import('../../src/scenarios/controls.js');
+  const keys = listedScenarios().map((s) => s.key);
+  for (const k of ['croc-jaws@1', 'fist-arm@1', 'hammer-bowl@1']) assert.ok(keys.includes(k), k);
+  for (const k of ['croc-jaws@1', 'hammer-bowl@1', 'fist-arm@1']) {
+    const sc = getScenario(k), cfg = applyControls(sc.generate(3), { target: 200 });
+    const run = () => { const sim = sc.createSim(cfg); let h = 0; for (let f = 0; f < 900 && !sim.done; f++) { sim.step(); h = (h * 31 + sim.count + Math.round(sim.x[0])) >>> 0; } return [h, sim.peak]; };
+    const a = run(); assert.deepEqual(a, run(), k); assert.ok(a[1] > 10, `${k} peak ${a[1]}`);
+  }
+});
+

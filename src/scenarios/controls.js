@@ -10,10 +10,10 @@ export const LENGTHS = {
   long: { minS: 60, maxS: 95, slow: 1.3, ball: 0.64 },
 };
 // families whose growth is exponential (scissors / lasers) need extra slowing for the longer lengths
-const FAST_GROWTH = { 'orbit-crusher': 2.1, 'laser-cross': 1.7 };
+const FAST_GROWTH = { 'orbit-crusher': 2.1, 'laser-cross': 1.7, 'laser-spin': 1.7 };
 // families whose squeeze depends on the ball size (the ram heads pass the rim one ball apart): never shrink their balls
-const FIXED_BALL = { rams: true };
-const AUTO_GRAVITY = { 'orbit-crusher': 'center', 'split-chamber': 'center' };   // everything else: down
+const FIXED_BALL = { rams: true, 'croc-jaws': true, 'fist-arm': true, 'hammer-bowl': true, invent: true };
+const AUTO_GRAVITY = { 'orbit-crusher': 'center', 'split-chamber': 'center', 'laser-spin': 'center' };   // everything else: down
 const ENDINGS = {
   'rim-break': { type: 'rim-break', gapHalf: 0.55, gravity: 1400, duration: 3.0 },
   gold: { type: 'cap-gold', gapHalf: 0.5 },
@@ -40,7 +40,8 @@ export function applyControls(cfg, ctl = {}) {
   const c = { ...DEFAULT_CONTROLS, ...ctl };
   const family = cfg.scenario.split('@')[0];
   // gravity: a decision, never a coin toss
-  const gmode = c.gravity === 'auto' ? (AUTO_GRAVITY[family] || 'on') : c.gravity;
+  // an invented machine says which gravity it was designed for
+  const gmode = c.gravity === 'auto' ? (AUTO_GRAVITY[family] || (cfg.invented && w.gravityMode === 'center' ? 'center' : 'on')) : c.gravity;
   if (gmode === 'off') { w.gravity = 0; delete w.gravityMode; }
   else if (gmode === 'center') { w.gravityMode = 'center'; if (!w.gravity) w.gravity = 520; }
   else { delete w.gravityMode; if (!w.gravity) w.gravity = 650; }

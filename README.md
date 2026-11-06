@@ -55,6 +55,9 @@ Press **How it works** in the Studio for the whole flow; select any video to see
 | **Melodic Rams** | Two pendulum rams with hammer heads; every swing is a little faster |
 | **Press Walls** | Two walls slide in and squeeze everything between them (they stop one ball apart) |
 | **Laser Cross** | A rotating laser splits everything it touches; the balls pile up on fixed wedges |
+| **Crocodile Jaws** | A toothed jaw hinged on the rim opens slowly and snaps onto a fixed lower jaw |
+| **Fist Arm** | Two arms with elbows swing against each other and punch against the rim |
+| **Hammer & Bowl** | A drop hammer from above lifts slowly and falls into a V bowl |
 
 **One rule for every pattern:** all parts are solid, so balls collide with them and never pass through. A ball squeezed between a moving part and a wall or another part **always** splits; nothing is left to chance. The only thing balls pass through is the glowing laser, and it splits whatever it touches. Every video is checked for balls inside solid parts.
 
