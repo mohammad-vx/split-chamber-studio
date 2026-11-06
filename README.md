@@ -1,8 +1,10 @@
 # Split Chamber Studio
 
-[![Promo video: Split Chamber Studio in 32 seconds](docs/media/promo-poster.jpg)](docs/media/promo.mp4)
 
-*32-second promo, made from the app's own footage: [watch it](docs/media/promo.mp4).*
+
+https://github.com/user-attachments/assets/40776ce7-33b2-4495-8a53-636f7ce657af
+
+
 
 A desktop tool that **generates satisfying ball-simulation videos automatically**. You choose a pattern, how many videos you want and the caption language, then press **Generate**. Every video is:
 
