@@ -6,6 +6,11 @@ https://github.com/user-attachments/assets/40776ce7-33b2-4495-8a53-636f7ce657af
 
 
 
+### ▶ Try it in your browser
+
+**https://mohammad-vx.github.io/split-chamber-studio/** — no install. Works best in Chrome or Edge on a computer;
+videos stay in your browser and download as MP4.
+
 ### What's new in 3.2 (40 s, with sound)
 
 [![What's new in Split Chamber Studio 3.2](docs/media/promo-3.2-poster.jpg)](docs/media/promo-3.2.mp4)

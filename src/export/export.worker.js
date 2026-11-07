@@ -117,7 +117,10 @@ async function run(job) {
   const quality = new Quality({ bitrate: job.video.bitrate });
   const ok = await canEncodeVideo('avc', { width: w, height: h, frameRate: FPS, quality, hardwareAcceleration: hw });
   if (!ok) throw new Error(`WebCodecs cannot encode H.264 ${w}x${h}@60 (${hw}).`);
-  const withAudio = !!job.audio && await canEncodeAudio('aac', { numberOfChannels: 2, sampleRate: job.audio.sampleRate, quality: new Quality({ bitrate: 192e3 }) });
+  // AAC first (the desktop remuxes in AAC if it is missing); the website build has no ffmpeg, so it may fall back to Opus
+  const canAudio = (codec) => canEncodeAudio(codec, { numberOfChannels: 2, sampleRate: job.audio.sampleRate, quality: new Quality({ bitrate: 192e3 }) });
+  const audioCodec = !job.audio ? null : await canAudio('aac') ? 'aac' : job.allowOpus && await canAudio('opus') ? 'opus' : null;
+  const withAudio = !!audioCodec;
 
   const writable = new WritableStream({
     write: (chunk) => {
@@ -137,7 +140,7 @@ async function run(job) {
   output.addVideoTrack(video, { frameRate: FPS });
   let audio = null;
   if (withAudio) {
-    audio = new AudioSampleSource({ codec: 'aac', quality: new Quality({ bitrate: 192e3 }) });
+    audio = new AudioSampleSource({ codec: audioCodec, quality: new Quality({ bitrate: 192e3 }) });
     output.addAudioTrack(audio);
   }
   await output.start();
@@ -167,5 +170,5 @@ async function run(job) {
     }
   }
   await output.finalize();
-  self.postMessage({ type: 'done', audioMuxed: withAudio, encoder: 'mediabunny', encoderConfig: encoderConfig && { codec: encoderConfig.codec, hardwareAcceleration: encoderConfig.hardwareAcceleration, bitrate: encoderConfig.bitrate } });
+  self.postMessage({ type: 'done', audioMuxed: withAudio, audioCodec, encoder: 'mediabunny', encoderConfig: encoderConfig && { codec: encoderConfig.codec, hardwareAcceleration: encoderConfig.hardwareAcceleration, bitrate: encoderConfig.bitrate } });
 }

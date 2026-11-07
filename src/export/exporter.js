@@ -89,7 +89,7 @@ function runOnce(session, audio, key, eng, opts, onProgress) {
         else if (m.type === 'error') fail(new Error(m.message));
         else if (m.type === 'done') {
           onProgress({ stage: 'verify', frame: frameCount, total: frameCount });
-          const res = await window.host.exportFinish(jobId, { audioMuxed: m.audioMuxed });
+          const res = await window.host.exportFinish(jobId, { audioMuxed: m.audioMuxed, audioCodec: m.audioCodec });
           settled = true; worker.terminate();
           res.renderSeconds = (performance.now() - t0) / 1000;
           res.encoderConfig = m.encoderConfig || null;
@@ -114,7 +114,7 @@ function runOnce(session, audio, key, eng, opts, onProgress) {
         config: session.config || null, hashes: session.summary ? session.summary.hashes : null,
         scale, caption: opts.caption || null,
         video: { bitrate: (opts.bitrateMbps || DEFAULT_BITRATE_MBPS) * 1e6, hardwareAcceleration: eng.hw },
-        pngFrames: opts.pngFrames || null,
+        pngFrames: opts.pngFrames || null, allowOpus: !!window.host.web,
       });
     })().catch(fail);
   });

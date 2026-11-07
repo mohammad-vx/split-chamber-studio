@@ -6,6 +6,8 @@ import { Pipeline } from '../pipeline/pipeline.js';
 
 const $ = (id) => document.getElementById(id);
 const S = () => window.host.studio;
+// library media URL: lib:// in the desktop app, ./lib/… (service worker) in the website build
+const libUrl = (id, file) => (window.host.libUrl ? window.host.libUrl(id, file) : `lib://library/videos/${id}/${file}`);
 const fmtGB = (b) => (b / 1024 ** 3).toFixed(2);   // quota is 12 GiB; show it as 12.00 GB
 const REASONS = ['boring', 'too similar', 'glitch', 'audio', 'other'];
 
@@ -118,7 +120,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     const el = document.createElement('div');
     el.className = `card${i === state.sel ? ' sel' : ''}`;
     el.tabIndex = 0;
-    const thumb = it.thumb ? `<img src="lib://library/videos/${it.id}/${it.thumb}" alt="">` : `<div class="noimg">${it.status}</div>`;
+    const thumb = it.thumb ? `<img src="${libUrl(it.id, it.thumb)}" alt="">` : `<div class="noimg">${it.status}</div>`;
     const reasons = (it.reasons || []).slice(0, 2).map((r) => `<li>${r}</li>`).join('');
     el.innerHTML = `${thumb}<div class="meta">${it.invented ? '<span class="badge-invented">✦ Invented</span>' : ''}<strong>${it.label || it.scenario}</strong>
       <span>seed ${it.seed}${it.durationS ? ` · ${it.durationS.toFixed(1)} s` : ''}${it.score != null ? ` · score ${it.score}` : ''}</span>
@@ -171,7 +173,9 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
         const have = it.masters && it.masters[lang];
         if (!have && (!it.caption || it.caption.lang !== lang)) btn(`Export ${lang === 'none' ? 'no-text' : lang.toUpperCase()} version`, () => run(`Exporting ${lang} version`, () => state.pipeline.accept(it.id, { lang })));
       }
-      btn('📁 Open folder', () => window.host.show(null));
+      if (window.host.web) {   // website: no folder to open, so hand over the files
+        for (const m of Object.values(it.masters || {})) btn(`⬇ Download ${m.file}`, () => window.host.download(it.id, m.file));
+      } else btn('📁 Open folder', () => window.host.show(null));
       if (it.masters && Object.keys(it.masters).length) btn('🗑 Delete master (keep reproducible)', () => run('Deleting master', async () => {
         await S().removeMedia(it.id, ['master']);
         await S().update(it.id, { masters: {}, note: 'master deleted to save space — Reproduce re-renders it' });
@@ -205,7 +209,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
       return;
     }
     const v = $('st-video');
-    v.src = `lib://library/videos/${it.id}/${file}`;
+    v.src = libUrl(it.id, file);
     const info = [];
     if (it.preview) info.push(`Preview: ${it.preview.verify.width}×${it.preview.verify.height}, ${it.preview.verify.frames} frames`);
     if (it.masters && it.masters.default) {

@@ -4,6 +4,17 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.3.0 — 2026-11-07 · The Studio as a website
+- Runs in the browser with no install: https://mohammad-vx.github.io/split-chamber-studio/ (Chrome or Edge on a
+  computer recommended). The same renderer code as the desktop app; `node tools/build-web.mjs` builds the static
+  site into `dist-web/`.
+- The library lives in the browser (IndexedDB), served to thumbnails and players by a service worker; finished
+  videos have ⬇ Download buttons instead of "Open folder".
+- The checks ffmpeg makes on the desktop are measured in the page: loudness (the app's BS.1770 meter), true peak,
+  silences, frozen/black picture, frame hashes for duplicates, thumbnails, and the master quality gate (SSIM and
+  frame accuracy against truth frames). Measured on Crocodile Jaws seed 300: −14.5 LUFS, master SSIM 0.993, 6/6.
+- Export in the browser uses WebCodecs only (no FFmpeg engines); without an AAC encoder it falls back to Opus.
+
 ## 3.2.0 — 2026-11-07 · Every video visible, inventor tuned
 - Rejected videos keep a picture (drawn from the simulation, no encode), ▶ Play replays them live from their
   settings, and ✓ Accept anyway makes the verified master of a rejected video.

@@ -6,3 +6,4 @@ baseline/**/*.mp4
 graphify-out/
 *.log
 .env*
+dist-web/
