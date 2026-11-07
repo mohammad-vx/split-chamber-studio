@@ -128,7 +128,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
       ${it.controls ? `<span class="cap">gravity ${it.controls.gravity} · ${it.controls.length} · ${it.controls.ending}</span>` : ''}
       ${it.caption ? `<span class="cap">${it.caption.lang.toUpperCase()}: <bdi dir="auto">${it.caption.text}</bdi></span>` : ''}
       ${reasons ? `<ul class="why">${reasons}</ul>` : ''}${it.lastError ? `<ul class="why"><li>${it.lastError.split('\n')[0]}</li></ul>` : ''}</div>`;
-    el.onclick = () => { state.sel = i; render(); };
+    el.onclick = () => { state.sel = i; state.sheet = true; render(); };   // phones: tapping a card opens its action sheet
     el.ondblclick = () => open(it);
     return el;
   }
@@ -147,7 +147,12 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
   function renderActions(it) {
     const box = $('st-actions');
     box.innerHTML = '';
+    box.classList.toggle('open', !!(it && state.sheet));
     if (!it) return;
+    const head = document.createElement('div'); head.className = 'sheet-head';   // shown on phones only (CSS)
+    head.innerHTML = `<strong>${it.label || it.scenario} · seed ${it.seed}</strong><button class="ghost" aria-label="Close">✕</button>`;
+    head.querySelector('button').onclick = () => { state.sheet = false; box.classList.remove('open'); };
+    box.appendChild(head);
     const btn = (label, fn, cls = '') => { const b = document.createElement('button'); b.textContent = label; b.className = cls; b.disabled = state.busy; b.onclick = fn; box.appendChild(b); };
     btn('▶ Play', () => open(it));
     if (it.status === 'rejected') {                 // see it anyway, and keep it if you like it

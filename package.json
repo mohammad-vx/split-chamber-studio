@@ -1,7 +1,7 @@
 {
   "name": "split-chamber",
   "productName": "Split Chamber Studio",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "Split Chamber Studio: deterministic ball-simulation video factory (generate, check, review, export 1080x1920 60 fps).",
   "main": "main.js",
   "private": true,

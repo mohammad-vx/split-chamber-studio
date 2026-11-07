@@ -1,23 +1,18 @@
 # Split Chamber Studio
 
 
+### ▶ Watch the video (40 s, with sound)
 
-https://github.com/user-attachments/assets/40776ce7-33b2-4495-8a53-636f7ce657af
-
-
-
-### ▶ Try it in your browser
-
-**https://mohammad-vx.github.io/split-chamber-studio/** — no install. Works best in Chrome or Edge on a computer;
-videos stay in your browser and download as MP4.
-
-### What's new in 3.2 (40 s, with sound)
-
-[![What's new in Split Chamber Studio 3.2](docs/media/promo-3.2-poster.jpg)](docs/media/promo-3.2.mp4)
+[![Split Chamber Studio — tap to play](docs/media/promo-3.2-play.jpg)](https://mohammad-vx.github.io/split-chamber-studio/media/promo.mp4)
 
 Six new machines built from parts mounted on parts · **✦ Invent**: machines the app designs by itself, now tuned so
 9 in 10 pass the checks · every rejected video keeps a picture, replays live and can be accepted anyway ·
 **★ Save as pattern** for the inventions you love.
+
+### ▶ Try it in your browser
+
+**https://mohammad-vx.github.io/split-chamber-studio/** — no install, works on a computer or a phone (Chrome or
+Edge recommended); videos stay in your browser and download as MP4.
 
 A desktop tool that **generates satisfying ball-simulation videos automatically**. You choose a pattern, how many videos you want and the caption language, then press **Generate**. Every video is:
 

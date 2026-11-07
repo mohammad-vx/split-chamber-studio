@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.resolve(root, process.argv[2] || 'dist-web');
@@ -23,11 +24,15 @@ edit('export/export.worker.js', (s) => s.replace('../../node_modules/mediabunny/
 edit('index.html', (s) => s
   .replace(/ lib:/g, '')
   .replace('<script type="module" src="ui/app.js"></script>', '<script type="module" src="host-web.js"></script>\n  <script type="module" src="ui/app.js"></script>')
+  .replace('href="styles.css"', `href="styles.css?v=${createHash('sha1').update(fs.readFileSync(path.join(root, 'src/styles.css'))).digest('hex').slice(0, 8)}"`)
   .replace('>Show in folder<', '>Download video<')
   .replace('</head>', '  <style>#btn-folder{display:none}</style>\n</head>'));
 fs.writeFileSync(path.join(out, 'host-web.js'), fs.readFileSync(path.join(root, 'web/host-web.js'), 'utf8').replace('__APP_VERSION__', version));
 fs.copyFileSync(path.join(root, 'web/sw.js'), path.join(out, 'sw.js'));
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
+// the promo video, played straight from the README's poster link (repo files don't play inline on GitHub)
+fs.mkdirSync(path.join(out, 'media'), { recursive: true });
+fs.copyFileSync(path.join(root, 'docs/media/promo-3.2.mp4'), path.join(out, 'media/promo.mp4'));
 
 let files = 0, bytes = 0;
 const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else { files++; bytes += fs.statSync(p).size; } } };

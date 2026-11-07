@@ -4,6 +4,15 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.3.1 — 2026-11-07 · Phone layout
+- The Studio fits a phone: one scrolling page, two videos per row, full-width buttons sized for touch, and the
+  action column becomes a sheet that slides up when you tap a video (✕ closes it).
+- Tap the picture to pause during live play (Restart and Main menu are on the pause panel); the keyboard hints are
+  hidden on small screens. Desktop layout unchanged.
+- Website build: the stylesheet link carries a content hash, so phones pick up layout changes without a stale copy.
+- README: one video instead of two. The 3.2 promo is the only one, and its poster plays it from the website (a
+  repo file opened GitHub's file page instead of playing).
+
 ## 3.3.0 — 2026-11-07 · The Studio as a website
 - Runs in the browser with no install: https://mohammad-vx.github.io/split-chamber-studio/ (Chrome or Edge on a
   computer recommended). The same renderer code as the desktop app; `node tools/build-web.mjs` builds the static
