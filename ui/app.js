@@ -345,6 +345,12 @@ $('btn-save').onclick = saveSession;
 $('btn-ex-cancel').onclick = () => state.exportJob && state.exportJob.cancel();
 $('btn-ex-done').onclick = () => { state.mode = 'ended'; show('end'); };
 
+// touch screens: a tap on the picture pauses / resumes (the paused panel has Restart and Main menu)
+$('stage').addEventListener('click', () => {
+  if (!$('studio').classList.contains('hidden')) return;
+  if ((state.mode === 'play' || state.mode === 'replay') && !state.paused) pause(true);
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (!$('studio').classList.contains('hidden')) return; // the Studio home has its own shortcuts

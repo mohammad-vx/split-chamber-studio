@@ -155,3 +155,53 @@ input[type=text], select { font: inherit; color: var(--text); background: rgba(0
 .badge-invented { display: inline-block; margin-bottom: 3px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #1b1300; background: linear-gradient(90deg, #ffd66b, #ffb547); }
 .save-pattern { display: flex; gap: 6px; margin: 8px 0; } .save-pattern input { flex: 1; min-width: 0; }
 .save-pattern { flex-wrap: wrap; } .save-pattern input { flex: 1 1 100%; } .save-pattern button { flex: 1 1 100%; }
+
+/* ---------------------------------------------------------------- Phones and narrow windows */
+.sheet-head { display: none; }
+@media (max-width: 760px) {
+  html, body { font-size: 15px; }
+  button, select, input { touch-action: manipulation; }
+  .panel { width: min(92%, 420px); padding: 20px 16px 16px; max-height: 92vh; overflow-y: auto; }
+  .panel h1 { font-size: 28px; }
+  .panel button { padding: 11px 12px; }
+  #hud-hint { display: none; }
+
+  .studio { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .studio > * { flex-shrink: 0; }   /* the page scrolls; no row may be squeezed to fit */
+  .st-head { flex-wrap: wrap; gap: 10px; padding: 12px 12px 8px; }
+  .st-brand { gap: 10px; }
+  .st-brand svg { width: 34px; height: 34px; }
+  .st-brand h1 { font-size: 17px; }
+  .st-quota .bar { width: 90px; }
+  .st-buttons { width: 100%; gap: 8px; }
+  .st-buttons button { flex: 1; padding: 10px 6px; font-size: 14px; }
+  .st-gen, .st-job, .st-batch { margin: 0 12px 10px; gap: 10px; }
+  .st-gen label { width: 100%; justify-content: space-between; }
+  .st-gen select { max-width: 62%; }
+  .st-gen #st-start, .st-gen #st-gen-cancel { flex: 1; padding: 11px; }
+  .st-job > div:first-child { min-width: 0; width: 100%; }
+  .st-job .bar { min-width: 100%; }
+  .st-tabs { padding: 0 12px; overflow-x: auto; }
+  .st-tabs button { white-space: nowrap; font-size: 13px; padding: 8px 10px; }
+  .st-filters { padding: 10px 12px 0; gap: 8px; }
+  .st-filters select, .st-filters #st-search { flex: 1 1 40%; min-width: 0; }
+  .st-body { display: block; flex: none; }
+  .st-grid { overflow: visible; padding: 12px 12px 90px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .card .meta { font-size: 11px; padding: 6px 8px 8px; }
+
+  /* the action column becomes a bottom sheet, opened by tapping a card */
+  .st-actions { position: fixed; left: 0; right: 0; bottom: 0; width: auto; max-height: 72vh; z-index: 30;
+    border-left: none; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; background: #0c111a;
+    padding: 12px 14px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 30px rgba(0,0,0,.55);
+    transform: translateY(105%); transition: transform .22s ease-out; }
+  .st-actions.open { transform: none; }
+  .st-actions button { padding: 11px; font-size: 15px; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: -12px;
+    background: #0c111a; padding: 2px 0 8px; z-index: 1; }
+  .sheet-head strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-head button { padding: 6px 12px !important; flex: none; }
+  .save-pattern input { font-size: 16px; }   /* 16 px: iOS does not zoom into the field */
+
+  #st-player { padding: 10px; max-width: 96vw; }
+  #st-player video { height: auto; max-height: 74vh; width: 90vw; }
+}
