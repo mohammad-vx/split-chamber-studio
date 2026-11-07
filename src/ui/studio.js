@@ -14,7 +14,7 @@ const REASONS = ['boring', 'too similar', 'glitch', 'audio', 'other'];
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
-  const state = { tab: 'review', items: [], sel: 0, busy: false, pipeline: null, info: null, reasons: new Set(), debug: {}, current: null, batch: null };
+  const state = { tab: 'review', items: [], sel: 0, busy: false, pipeline: null, info: null, reasons: new Set(), debug: {}, current: null, batch: null, timing: {}, etaTimer: 0 };
 
   /** The most recent batch: the running one, else the newest batch id found in the library. */
   function lastBatchId() {
@@ -250,15 +250,23 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
   function onEvent(ev) {
     if (ev.type === 'stage') {
       const p = ev.stage === 'preview' || ev.stage === 'master' ? ev : null;
-      const sub = p && p.stage === 'video' ? ` · ${p.frame}/${p.total} · ${p.fps.toFixed(0)} fps` : p && p.stage === 'verify' ? ' · verifying' : '';
+      const sub = p && p.step === 'video' ? ` · ${p.frame}/${p.total} · ${p.fps.toFixed(0)} fps` : p && p.step === 'verify' ? ' · verifying' : '';
       $('st-job-stage').textContent = `${STAGES[ev.stage] || ev.stage}${sub}`;
-      if (p && p.stage === 'video') jobBar($('st-job-label').textContent, p);
+      if (p && p.step === 'video') { jobBar($('st-job-label').textContent, p); if (ev.stage === 'preview' && state.timing) state.timing.previewFrac = p.frame / p.total; }
     } else if (ev.type === 'batch') {
       $('st-job-label').textContent = `Video ${ev.index + 1} of ${ev.total} · ${labelOf(ev.scenario)} · seed ${ev.seed}`;
+      Object.assign(state.timing, { index: ev.index, total: ev.total, videoStart: performance.now(), previewFrac: 0 });
+      showEta();
     } else if (ev.type === 'batch-start') {
       state.batch = ev.batch; $('st-filter-batch').value = 'last'; refresh();
+      state.timing = { start: performance.now(), index: 0, total: ev.batch.total, videoStart: performance.now(), previewFrac: 0 };
+      clearInterval(state.etaTimer); state.etaTimer = setInterval(showEta, 5000);
+      $('st-job-note').classList.toggle('hidden', !window.host.web);
     } else if (ev.type === 'batch-done') {
       state.batch = null; state.current = null; liveButton(); refresh();
+      clearInterval(state.etaTimer); state.timing = {}; $('st-job-eta').textContent = ''; $('st-job-note').classList.add('hidden');
+      document.title = TITLE;
+      notifyDone(ev.results || [], ev.batch);
     } else if (ev.type === 'config') {
       state.current = ev; liveButton();
       if (onWatch) onWatch(ev, false);       // the live view (if open) follows the batch to the next video
@@ -267,6 +275,58 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
       refresh();
     } else if (ev.type === 'paused') toast(ev.reason, 8000);
     else if (ev.type === 'stopped') toast(ev.reason, 9000);
+  }
+
+  // ---- time left: average time of this batch's finished videos (the first video estimates from its preview progress)
+  const TITLE = document.title;
+  function fmtLeft(ms) {
+    const m = Math.round(ms / 60000);
+    return ms < 60000 ? 'less than a minute left' : m < 60 ? `about ${m} min left` : `about ${Math.floor(m / 60)} h ${m % 60} min left`;
+  }
+  function showEta() {
+    const t = state.timing; if (!t || !t.total) return;
+    const now = performance.now(), doneN = t.index, inVideo = now - t.videoStart;
+    let per = doneN > 0 ? (t.videoStart - t.start) / doneN : null;
+    if (per == null && t.previewFrac > 0.05) per = inVideo / (0.35 + 0.6 * t.previewFrac);   // the preview is ~60 % of a video's time
+    const left = per == null ? null : Math.max(0, per * (t.total - doneN) - inVideo);
+    $('st-job-eta').textContent = left == null ? '· estimating time…' : `· ${fmtLeft(left)}`;
+    document.title = `(${doneN}/${t.total}) ${TITLE}`;
+  }
+
+  // ---- browser notification when a batch ends (website only: the page may be in the background)
+  function askNotify() {
+    if (!window.host.web || typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+    try { const p = Notification.requestPermission(); if (p && p.catch) p.catch(() => {}); } catch { /* unsupported */ }
+  }
+  async function notifyDone(results, batch) {
+    if (!window.host.web || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const n = (s) => results.filter((r) => r.status === s).length;
+    const body = `${n('candidate')} waiting for review${n('accepted') ? `, ${n('accepted')} accepted` : ''}, ${n('rejected')} rejected${batch && results.length < batch.total ? `, ${batch.total - results.length} not made` : ''}.`;
+    const opts = { body, tag: 'split-chamber-batch' };
+    try {
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.showNotification('Split Chamber: batch finished', opts); else new Notification('Split Chamber: batch finished', opts);
+    } catch { /* notifications blocked or unsupported */ }
+  }
+
+  // ---- continue a batch that a reload, a closed tab or a crash interrupted
+  async function offerResume() {
+    const q = await S().queue('load');
+    const box = $('st-resume');
+    if (!q || !(q.count > q.done) || state.busy) { box.classList.add('hidden'); return; }
+    const left = q.count - q.done;
+    $('st-resume-text').textContent = `A batch was interrupted: ${q.done} of ${q.count} done, ${left} left (${q.pattern && q.pattern !== 'random' ? labelOf(q.pattern) : 'random patterns'}).`;
+    $('st-resume-go').textContent = `▶ Continue (${left} left)`;
+    box.classList.remove('hidden');
+    $('st-resume-no').onclick = async () => { await S().queue('clear'); box.classList.add('hidden'); };
+    $('st-resume-go').onclick = () => {
+      box.classList.add('hidden'); askNotify(); state.tab = 'review';
+      const { done, startedAt, owner, seeds, ...opts } = q;
+      run(`Continuing: ${left} video${left > 1 ? 's' : ''}`, async () => {
+        const res = await state.pipeline.runBatch({ ...opts, count: left, owner: 'ui', ...(seeds ? { seeds: seeds.slice(done) } : {}) });
+        toast(`Batch finished: ${res.filter((r) => r.status === 'candidate').length} waiting for review, ${res.filter((r) => r.status === 'rejected').length} rejected by the checks.`, 9000);
+      });
+    };
   }
 
   function generatePanel(show) { $('st-gen').classList.toggle('hidden', !show); }
@@ -282,6 +342,8 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     const count = Number($('st-count').value) || 1;
     const pattern = $('st-pattern').value, captions = $('st-captions').value;
     generatePanel(false);
+    askNotify();
+    $('st-resume').classList.add('hidden');
     state.tab = 'review';
     await run(`Generating ${count} video${count > 1 ? 's' : ''}`, async () => {
       const autoAcceptScore = $('st-auto').checked ? Number($('st-auto-score').value) : null;
@@ -335,8 +397,8 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     $('st-player-close').onclick = () => { $('st-video').pause(); $('st-player').close(); };
     document.querySelectorAll('#st-counts button').forEach((b) => { b.onclick = () => { $('st-count').value = b.dataset.n; }; });
     window.addEventListener('keydown', keys);
-    const q = await S().queue('load');
-    if (q && q.count > q.done) toast(`A batch was interrupted (${q.done} of ${q.count} done). Press Generate to start a new one.`, 8000);
+    window.addEventListener('beforeunload', (e) => { if (state.busy && window.host.web) { e.preventDefault(); e.returnValue = ''; } });
+    await offerResume();
     await refresh();
   }
 

@@ -4,6 +4,18 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.4.0 — 2026-11-07 · Continue, time left, notification
+- Continue an interrupted batch: if the page was reloaded or closed (or the app crashed) mid-batch, the Studio shows
+  "A batch was interrupted: 3 of 10 done" with ▶ Continue (same pattern, settings and remaining seeds) or Dismiss.
+  Finished videos were always kept; now the rest of the batch is too.
+- Time left: the job bar shows "about 6 min left", from the average time of the batch's finished videos (the first
+  video estimates from its preview progress); the tab title shows progress, e.g. "(3/10) Split Chamber Studio".
+- Website: a browser notification when a batch ends (permission asked once, on Generate; tapping it brings the tab
+  back). A note in the job bar says to keep the page open, the screen stays on during a batch (taken again when you
+  come back to the page), and leaving the page mid-batch asks first.
+- Fix: the job bar showed "video" instead of "Rendering preview · frame/total" (export progress overwrote the stage).
+- Website: the service worker revalidates the app's files, so an update never mixes old and new modules.
+
 ## 3.3.1 — 2026-11-07 · Phone layout
 - The Studio fits a phone: one scrolling page, two videos per row, full-width buttons sized for touch, and the
   action column becomes a sheet that slides up when you tap a video (✕ closes it).
