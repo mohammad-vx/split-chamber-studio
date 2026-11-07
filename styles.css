@@ -91,6 +91,11 @@ input[type=text], select { font: inherit; color: var(--text); background: rgba(0
 .row-inline { display: flex; gap: 6px; }
 .row-inline button { padding: 6px 10px; }
 .st-job { justify-content: space-between; }
+.st-job .eta { color: var(--gold); font-size: 13px; white-space: nowrap; }
+#st-job-note { width: 100%; }
+.st-resume { margin: 0 24px 10px; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(242,180,55,.08);
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.st-resume span { flex: 1; min-width: 200px; }
 .st-job > div:first-child { flex: 1; min-width: 260px; }
 .st-job .bar { flex: 1; min-width: 160px; }
 .st-tabs { display: flex; gap: 6px; padding: 0 24px; border-bottom: 1px solid var(--line); }
@@ -175,7 +180,8 @@ input[type=text], select { font: inherit; color: var(--text); background: rgba(0
   .st-quota .bar { width: 90px; }
   .st-buttons { width: 100%; gap: 8px; }
   .st-buttons button { flex: 1; padding: 10px 6px; font-size: 14px; }
-  .st-gen, .st-job, .st-batch { margin: 0 12px 10px; gap: 10px; }
+  .st-gen, .st-job, .st-batch, .st-resume { margin: 0 12px 10px; gap: 10px; }
+  .st-resume button { flex: 1; padding: 11px; }
   .st-gen label { width: 100%; justify-content: space-between; }
   .st-gen select { max-width: 62%; }
   .st-gen #st-start, .st-gen #st-gen-cancel { flex: 1; padding: 11px; }

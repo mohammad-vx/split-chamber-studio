@@ -281,14 +281,19 @@ function pickFile(accept) {
   });
 }
 
-let wakeLock = null;
+let wakeLock = null, wantAwake = false;
+// the browser drops the screen wake lock whenever the page is hidden: take it again when the page comes back
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !wantAwake || !navigator.wakeLock) return;
+  try { if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock.request('screen'); } catch { wakeLock = null; }
+});
 const noop = async () => {};
 
 window.host = {
   web: true,
   libUrl: (id, file) => `lib/${vpath(id, file)}`,
   download: (id, file) => download(vpath(id, file), `SplitChamber_${id}_${file}`),
-  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.3.1', gate: null, bench: null }),
+  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.4.0', gate: null, bench: null }),
   ffmpegEncoders: async () => ({}),
   async saveSession(buffer, meta) {
     const name = `SplitChamber_${stamp()}_seed${meta.seed}.scsession`, data = await gz(buffer, 'c');
@@ -322,6 +327,7 @@ window.host = {
     patterns: R(async (l) => { if (Array.isArray(l)) { await put('kv', 'patterns', l); return l; } return (await get('kv', 'patterns')) || []; }),
     audioReport: R(media.audioReport), videoReport: R(media.videoReport), dhash: R(media.dHashes), thumb: R(media.thumbnail), quality: R(media.qualityGate),
     async powerBlock(on) {
+      wantAwake = on;
       try { if (on && !wakeLock && navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } } catch { wakeLock = null; }
       return !!wakeLock;
     },

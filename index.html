@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Split Chamber Studio</title>
-  <link rel="stylesheet" href="styles.css?v=9aa0fae1">
+  <link rel="stylesheet" href="styles.css?v=6f41a89e">
   <style>#btn-folder{display:none}</style>
 </head>
 <body>
@@ -121,11 +121,13 @@
       <button id="st-gen-cancel" class="ghost">Close</button>
     </div>
     <div id="st-job" class="st-job hidden">
-      <div><strong id="st-job-label"></strong> <span id="st-job-stage" class="muted"></span></div>
+      <div><strong id="st-job-label"></strong> <span id="st-job-stage" class="muted"></span> <span id="st-job-eta" class="eta"></span></div>
       <div class="bar"><div id="st-job-progress"></div></div>
+      <p id="st-job-note" class="muted small hidden">Keep this page open while it works (on a phone, keep the screen on). If it stops, you can continue the batch where it left off.</p>
       <button id="st-watch" class="ghost">● Watch live</button>
       <button id="st-cancel">Stop</button>
     </div>
+    <div id="st-resume" class="st-resume hidden"><span id="st-resume-text"></span><button id="st-resume-go" class="primary">▶ Continue</button><button id="st-resume-no" class="ghost">Dismiss</button></div>
     <div id="st-batch" class="st-batch hidden"></div>
     <nav class="st-tabs">
       <button id="st-tab-review" class="on">Waiting for review <b>0</b></button>

@@ -34,7 +34,25 @@ async function serve(key, req) {
 
 self.addEventListener('fetch', (e) => {
   const base = new URL('./lib/', self.registration.scope).href;
-  if (!e.request.url.startsWith(base)) return;
+  if (!e.request.url.startsWith(base)) {
+    // the app's own files: always revalidate (cheap 304s), so an update never mixes old and new modules
+    if (e.request.method === 'GET' && e.request.url.startsWith(self.registration.scope) && !e.request.headers.get('range')) {
+      const fresh = e.request.mode === 'navigate' ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request, { cache: 'no-cache' });
+      e.respondWith(fresh.catch(() => fetch(e.request)));
+    }
+    return;
+  }
   const key = decodeURIComponent(e.request.url.slice(base.length).split('?')[0]);
   e.respondWith(serve(key, e.request).catch(() => new Response('Error', { status: 500 })));
+});
+
+// "batch finished" notification: bring the Studio tab forward (or open it)
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const tab = all.find((c) => c.url.startsWith(self.registration.scope));
+    if (tab) return tab.focus();
+    return self.clients.openWindow(self.registration.scope);
+  })());
 });
