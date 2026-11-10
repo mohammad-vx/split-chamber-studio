@@ -3,6 +3,8 @@ import { getScenario } from '../scenarios/index.js';
 
 self.onmessage = (e) => {
   const { key, seed, opts } = e.data;
-  try { self.postMessage({ type: 'done', config: getScenario(key).generate(seed, opts || {}) }); }
+  // the inventor reports each attempt, so the Studio can show that it is working
+  const o = { ...(opts || {}), onAttempt: (attempt) => self.postMessage({ type: 'progress', attempt }) };
+  try { self.postMessage({ type: 'done', config: getScenario(key).generate(seed, o) }); }
   catch (err) { self.postMessage({ type: 'error', message: String(err && err.message || err) }); }
 };

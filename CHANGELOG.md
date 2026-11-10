@@ -4,6 +4,14 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.7.2 — 2026-11-10 · Stop stops at once; the Studio says when it is inventing
+- Stop now ends the work in progress immediately. Before, a stopped batch went on inventing or simulating to the end
+  (minutes on a phone); a new batch started behind it and sat at "estimating time…" as if it had hung.
+- While ✦ Invent designs a machine the job bar says "Inventing a machine" and counts its tries. Inventing takes about
+  12 s on a desktop (43 s at worst) and several times that on a phone; before, nothing showed during that time.
+- Tried and not kept: calibrating with one simulation instead of three made inventing twice as fast, but only 18–20 of
+  24 machines passed the checks instead of 22.
+
 ## 3.7.1 — 2026-11-10 · Website on phones: the batch no longer hangs at "Checking audio & picture"
 - On a phone the batch stopped for ever at "Checking audio & picture" (the time left kept growing). The picture check
   steps through the preview in a hidden video element and waited, with no time limit, for the browser to say a frame
