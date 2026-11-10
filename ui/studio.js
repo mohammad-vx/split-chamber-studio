@@ -247,11 +247,11 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     else if (!p) $('st-job-progress').style.width = '0%';
   }
 
-  const STAGES = { simulate: 'Simulating', audio: 'Rendering soundtrack', preview: 'Rendering preview', analyse: 'Checking audio & picture', master: 'Rendering master', quality: 'Quality check', verify: 'Verifying' };
+  const STAGES = { invent: 'Inventing a machine', simulate: 'Simulating', audio: 'Rendering soundtrack', preview: 'Rendering preview', analyse: 'Checking audio & picture', master: 'Rendering master', quality: 'Quality check', verify: 'Verifying' };
   function onEvent(ev) {
     if (ev.type === 'stage') {
       const p = ev.stage === 'preview' || ev.stage === 'master' ? ev : null;
-      const sub = p && p.step === 'video' ? ` · ${p.frame}/${p.total} · ${p.fps.toFixed(0)} fps` : p && p.step === 'verify' ? ' · verifying' : '';
+      const sub = ev.stage === 'invent' && ev.attempt > 0 ? ` · try ${ev.attempt + 1}` : p && p.step === 'video' ? ` · ${p.frame}/${p.total} · ${p.fps.toFixed(0)} fps` : p && p.step === 'verify' ? ' · verifying' : '';
       $('st-job-stage').textContent = `${STAGES[ev.stage] || ev.stage}${sub}`;
       if (p && p.step === 'video') { jobBar($('st-job-label').textContent, p); if (ev.stage === 'preview' && state.timing) state.timing.previewFrac = p.frame / p.total; }
     } else if (ev.type === 'batch') {

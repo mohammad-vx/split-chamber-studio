@@ -416,6 +416,7 @@ export const inventV3 = machineModule('invent@3', '✦ Invent', (seed, o) => {
   const kept = [];
   for (let k = 0; k < ATTEMPTS; k++) {
     const layout = k < 8 ? first : others[(k - 8) % others.length];
+    if (o.onAttempt) o.onAttempt(k);   // the Studio shows "Inventing a machine · try N"
     const inv = invent3(seed, layout, k);
     if (!inv) continue;
     const near = closest(inv.sig, avoid, SIMILAR);

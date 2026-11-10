@@ -13,7 +13,7 @@ import { rand } from '../engine/rng.js';
 import { signature } from '../scenarios/novelty.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, explainNovelty, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '3.7.1';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.7.2';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -23,12 +23,22 @@ const b64 = (u32) => { const b = new Uint8Array(u32.buffer, u32.byteOffset, u32.
 const unb64 = (s) => { const bin = atob(s); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new Uint32Array(b.buffer); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Workers that are busy right now. Stop ends them at once: before 3.7.2 a stopped batch kept inventing or simulating
+// to the end (minutes on a phone), the next batch started behind it and sat at "estimating time…".
+const WORKING = new Set();
+function track(w, reject) { const job = { stop() { w.terminate(); WORKING.delete(job); reject(new Error('Export cancelled.')); } }; WORKING.add(job); return () => WORKING.delete(job); }
+export function stopWorkers() { for (const job of [...WORKING]) job.stop(); }
+
 /** Generate a config in a worker (used by scenarios whose generate() simulates, like the inventor). */
-export function generateInWorker(key, seed, opts) {
+export function generateInWorker(key, seed, opts, onProgress) {
   return new Promise((resolve, reject) => {
     const w = new Worker(new URL('./generate.worker.js', import.meta.url), { type: 'module' });
-    w.onmessage = (e) => { w.terminate(); if (e.data.type === 'done') resolve(e.data.config); else reject(new Error(e.data.message)); };
-    w.onerror = (e) => { w.terminate(); reject(new Error(e.message || 'generate worker crashed')); };
+    const done = track(w, reject);
+    w.onmessage = (e) => {
+      if (e.data.type === 'progress') { onProgress && onProgress(e.data); return; }
+      done(); w.terminate(); if (e.data.type === 'done') resolve(e.data.config); else reject(new Error(e.data.message));
+    };
+    w.onerror = (e) => { done(); w.terminate(); reject(new Error(e.message || 'generate worker crashed')); };
     w.postMessage({ key, seed, opts });
   });
 }
@@ -36,12 +46,13 @@ export function generateInWorker(key, seed, opts) {
 export function runHeadlessInWorker(config, onProgress) {
   return new Promise((resolve, reject) => {
     const w = new Worker(new URL('./headless.worker.js', import.meta.url), { type: 'module' });
+    const done = track(w, reject);
     w.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'progress') onProgress && onProgress(m.frame);
-      else { w.terminate(); if (m.type === 'done') resolve(m.summary); else reject(new Error(m.message)); }
+      else { done(); w.terminate(); if (m.type === 'done') resolve(m.summary); else reject(new Error(m.message)); }
     };
-    w.onerror = (e) => { w.terminate(); reject(new Error(e.message || 'headless worker crashed')); };
+    w.onerror = (e) => { done(); w.terminate(); reject(new Error(e.message || 'headless worker crashed')); };
     w.postMessage({ config });
   });
 }
@@ -52,7 +63,7 @@ export class Pipeline {
     this.cancelled = false; this.current = null; this.paused = false;
   }
 
-  cancel() { this.cancelled = true; if (this.current) this.current.cancel(); }
+  cancel() { this.cancelled = true; if (this.current) this.current.cancel(); stopWorkers(); }
 
   // export progress carries its own `stage` (audio / video / verify): keep it as `step` so it never hides the pipeline stage
   stage(id, stage, extra = {}) { this.emit({ type: 'stage', id, ...extra, step: extra.stage, stage }); }
@@ -155,7 +166,7 @@ export class Pipeline {
     const sc = getScenario(scenarioKey);
     const want = wantedBalls(controls && controls.balls);
     if (want && sc.ballSized && !baseConfig) genOpts = { ...(genOpts || {}), balls: want };   // the machine is built for the ball size
-    const base = baseConfig || (sc.heavyGenerate && typeof Worker !== 'undefined' ? await generateInWorker(scenarioKey, seed, genOpts || {}) : sc.generate(seed, genOpts || {}));
+    const base = baseConfig || (sc.heavyGenerate && typeof Worker !== 'undefined' ? await generateInWorker(scenarioKey, seed, genOpts || {}, (m) => this.stage(null, 'invent', { attempt: m.attempt })) : sc.generate(seed, genOpts || {}));
     const config = applyControls(base, controls || {});
     const id = await S().id(config);
     const existing = await S().get(id);
