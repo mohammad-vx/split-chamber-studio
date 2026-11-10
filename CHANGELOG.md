@@ -4,6 +4,20 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.5.0 — 2026-11-07 · Inventor v2: never the same machine twice
+- ✦ Invent is now invent@2: five new machine families on mechanisms the engine already had: wave (a ring of pistons
+  hammering the rim one after another), kaleidoscope (a random convex shape repeated 3–6 times, spinning, stepping or
+  rocking), pendulum (double / triple, unequal periods), Geneva drive (lobes turning in steps with a dwell) and orbit
+  (bodies on star-shaped epicycles, sometimes around pegs), plus v1's sweeper, press and blades.
+- Never the same machine twice: every invention gets a signature of what it covers and what it looks like over its
+  cycle (unchanged by turning or mirroring). An attempt at least 66 % like any machine you accepted, still have to
+  review, or made earlier in the batch is redrawn (up to 30 attempts); the batch starts with the family you have least
+  of. The novelty check compares signatures instead of names (v1 let "34° wide" and "35° wide" pass as different).
+- invent@1 still replays its videos but is no longer offered; ✦ Invent is the default pattern in Generate.
+- Orbit machines no longer buzz: their beat accent fired on every frame (the path had no period); a test now keeps
+  every family to accents on the beat.
+- docs/NO-REPEAT-PLAN.md: the plan (arenas, timed stories and more families come next).
+
 ## 3.4.0 — 2026-11-07 · Continue, time left, notification
 - Continue an interrupted batch: if the page was reloaded or closed (or the app crashed) mid-batch, the Studio shows
   "A batch was interrupted: 3 of 10 done" with ▶ Continue (same pattern, settings and remaining seeds) or Dismiss.

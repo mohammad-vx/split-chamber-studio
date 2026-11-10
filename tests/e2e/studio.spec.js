@@ -140,7 +140,7 @@ test('UI: an invented machine gets its badge and can be saved as a pattern', asy
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.waitForSelector('#studio:not(.hidden)');
   await page.click('#st-generate');
-  await page.selectOption('#st-pattern', 'invent@1');
+  await page.selectOption('#st-pattern', 'invent@2');
   await page.fill('#st-count', '1');
   await page.evaluate(() => { window.__splitChamber.testSeeds = [6]; });
   await page.click('#st-start');
@@ -148,7 +148,7 @@ test('UI: an invented machine gets its badge and can be saved as a pattern', asy
   const st = statuses(lib)[0];
   expect(st.invented && st.invented.name).toBeTruthy();
   expect(st.label).toContain('Invented');
-  expect(st.checks.some((c) => c.name === 'A machine you have not accepted yet')).toBe(st.status !== 'rejected' || st.rejectedAt === 'analyse');
+  expect(st.checks.some((c) => c.name.startsWith('A machine you'))).toBe(st.status !== 'rejected' || st.rejectedAt === 'analyse');
   await page.click(st.status === 'candidate' ? '#st-tab-review' : '#st-tab-rejected');
   await expect(page.locator('#st-grid .card .badge-invented').first()).toBeVisible();
   if (st.status === 'candidate') {

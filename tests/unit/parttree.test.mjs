@@ -95,7 +95,7 @@ test('phase-2 machines: listed, on the contact rule, deterministic, and they spl
 test('inventor: every seed is a different, named, reproducible machine, never picked at random', async () => {
   const { getScenario, listedScenarios, randomScenarios } = await import('../../src/scenarios/index.js');
   const sc = getScenario('invent@1');
-  assert.ok(listedScenarios().includes(sc) && !randomScenarios().includes(sc));
+  assert.ok(!listedScenarios().includes(sc) && !randomScenarios().includes(sc), 'v1 still replays, v2 is offered');
   const names = new Set(), families = new Set();
   for (let s = 1; s <= 12; s++) {
     const a = sc.generate(s, { precheck: false }), b = sc.generate(s, { precheck: false });   // calibration is tested below

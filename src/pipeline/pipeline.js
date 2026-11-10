@@ -10,9 +10,10 @@ import { renderSoundtrackFor } from '../audio/synth.js';
 import { startExport, AUTO_ORDER } from '../export/exporter.js';
 import { captionFor } from '../render/captions.js';
 import { rand } from '../engine/rng.js';
+import { signature } from '../scenarios/novelty.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, explainNovelty, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '3.4.0';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.5.0';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -90,7 +91,7 @@ export class Pipeline {
         let st;
         try {
           st = await this.generateOne({ scenarioKey: key, seed, captions: opts.captions || 'none', batch: { ...batch, index: i }, controls: opts.controls,
-            genOpts: key === 'invent@1' ? await this.inventOpts(i) : null });
+            genOpts: key.startsWith('invent@') ? await this.inventOpts(i, key) : null });
           if (st.status === 'candidate' && (opts.acceptAll || (opts.autoAcceptScore != null && st.score >= opts.autoAcceptScore))) st = await this.accept(st.id);
         } catch (e) {
           if (this.cancelled) break;
@@ -123,10 +124,31 @@ export class Pipeline {
   }
 
   /** One candidate. Returns its status object (candidate | rejected | failed). */
-  /** Inventor batches: rotate the three families, and skip structures that were already accepted. */
-  async inventOpts(i) {
-    const avoid = (await S().list()).filter((x) => x.status === 'accepted' && x.invented).map((x) => `${x.invented.family}: ${x.invented.name}`);
-    return { family: ['sweeper', 'press', 'blades'][i % 3], avoid };
+  /**
+   * Inventor batches. invent@1: rotate its three families, skip structures already accepted (by name).
+   * invent@2: every machine you kept or still have to review (accepted, candidates, this batch so far) is passed as a
+   * signature, so the inventor never draws one of them again (turned, mirrored or shifted); the family is the one you
+   * have least of.
+   */
+  async inventOpts(i, key = 'invent@1') {
+    const all = await S().list();
+    if (key === 'invent@1') {
+      const avoid = all.filter((x) => x.status === 'accepted' && x.invented).map((x) => `${x.invented.family}: ${x.invented.name}`);
+      return { family: ['sweeper', 'press', 'blades'][i % 3], avoid };
+    }
+    const avoid = [], count = {};
+    for (const x of all) {
+      if (!x.invented || x.status === 'rejected' || x.status === 'failed') continue;
+      let sig = x.invented.sig;
+      if (!sig) {   // inventions made before v2: work out their signature once and keep it
+        try { const c = await S().readJson(x.id, 'config.json'); sig = signature(c.machine.parts); await S().update(x.id, { invented: { ...x.invented, sig } }); } catch { continue; }
+      }
+      avoid.push(sig); count[x.invented.family] = (count[x.invented.family] || 0) + 1;
+    }
+    const fams = getScenario(key).families || [];
+    const least = Math.min(...fams.map((f) => count[f] || 0));
+    const pool = fams.filter((f) => (count[f] || 0) === least);
+    return { family: pool.length ? pool[i % pool.length] : null, avoid };
   }
 
   async generateOne({ scenarioKey, seed, captions, batch = null, controls = null, baseConfig = null, genOpts = null }) {
@@ -214,7 +236,8 @@ export class Pipeline {
     const accepted = (await S().list()).filter((x) => x.status === 'accepted' && x.id !== id);
     const dup = findDuplicate(descriptor, accepted);
     checks.push(...explainAudio(audio), ...explainVideo(video), explainDuplicate(dup));
-    const novel = explainNovelty(config, accepted);   // inventions: a new structure, not one already accepted
+    const kept = (await S().list()).filter((x) => x.id !== id && x.invented && (x.status === 'accepted' || x.status === 'candidate'));
+    const novel = explainNovelty(config, config.invented && config.invented.sig ? kept : accepted);   // inventions: a new machine, not one you have
     if (novel) checks.push(novel);
     const reasons = checks.filter((c) => !c.ok).map((c) => c.reason);
     if (reasons.length) return reject(reasons, 'analyse');

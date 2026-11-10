@@ -373,7 +373,9 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     const sel = $('st-pattern'), keep = sel.value;
     sel.innerHTML = '<option value="random">Random pattern</option>' + opts(listedScenarios());
     if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
-    $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + opts(listedScenarios());
+    else if (!keep && [...sel.options].some((o) => o.value === 'invent@2')) sel.value = 'invent@2';   // new machines by default
+    $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + opts(listedScenarios())
+      + '<option value="invent@1">✦ Invent (v1)</option>';   // older inventions stay findable
   }
 
   async function init() {
