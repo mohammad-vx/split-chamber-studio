@@ -4,6 +4,14 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.7.1 — 2026-11-10 · Website on phones: the batch no longer hangs at "Checking audio & picture"
+- On a phone the batch stopped for ever at "Checking audio & picture" (the time left kept growing). The picture check
+  steps through the preview in a hidden video element and waited, with no time limit, for the browser to say a frame
+  was ready; phone browsers load no frame for a video that is not in the page and has never played.
+- The element now sits in the page (2 px, off screen) and is started once, muted; every wait has a limit (20 s to
+  open, 6 s per step). A browser that still will not step through the video ends the check with what it measured
+  instead of stopping the batch. Desktop app unchanged (it checks with FFmpeg).
+
 ## 3.7.0 — 2026-11-10 · Inventor v3: machines put together freely
 - ✦ Invent is now invent@3. Instead of eight drawings whose numbers change, a machine is put together from
   independent choices: a layout (limbs on the hub, tools or small rotors on a ring around it, arms hinged on the rim
