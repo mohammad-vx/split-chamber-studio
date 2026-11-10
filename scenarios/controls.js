@@ -2,7 +2,22 @@
 // the video length and the ending. They are applied to the generated config (so they are stored with the video and
 // reproduce exactly). Only machine-engine configs are affected; frozen swarm/packed versions ignore them.
 
-export const DEFAULT_CONTROLS = { gravity: 'auto', target: 'max', length: 'short', ending: 'auto' };
+export const DEFAULT_CONTROLS = { gravity: 'auto', target: 'max', balls: 'auto', length: 'short', ending: 'auto' };
+
+// "Balls" (3.6): the count the arena is full at. The ball is sized for the count (10,000 balls: radius ~3.3 px),
+// between these limits; outside them the count still holds and the arena ends less full (or the count is capped).
+export const BALLS_MIN = 100, BALLS_MAX = 20000, BALL_R_MIN = 2.6, BALL_R_MAX = 16;
+const clampR = (r) => Math.max(BALL_R_MIN, Math.min(BALL_R_MAX, Math.floor(r * 10) / 10));
+/** A whole count inside the limits, or 0 for "auto". */
+export function wantedBalls(v) { const n = Math.floor(Number(v)); return n > 0 ? Math.max(BALLS_MIN, Math.min(BALLS_MAX, n)) : 0; }
+/** Ball radius at which `n` balls fill a round arena of radius `arenaR` with `free` of it open (same 0.6 packing as baseMachine). */
+export function radiusForBalls(n, free = 0.7, arenaR = 460) { return clampR(Math.sqrt(0.6 * free * arenaR * arenaR / n)); }
+/**
+ * Pieces per split for a ball size. A squeeze catches one layer of balls, so with small balls each stroke reaches a
+ * smaller share of them (measured: 10,000 balls at 3 pieces filled 21–29 % in 41 s). More pieces per split keeps the
+ * growth; the pacing curve still holds it back when it runs ahead.
+ */
+export function splitIntoFor(ballR) { return Math.max(3, Math.min(8, Math.round(1 + 2 * 10 / ballR))); }
 
 export const LENGTHS = {
   short: { minS: 30, maxS: 50, slow: 1, ball: 1 },
@@ -33,7 +48,7 @@ function scaleTime(parts, k) {
   }
 }
 
-/** Mutates and returns cfg. ctl: { gravity: auto|on|off|center, target: 'max'|number, length: short|medium|long, ending: auto|rim-break|gold|flood } */
+/** Mutates and returns cfg. ctl: { gravity: auto|on|off|center, target: 'max'|number, balls: 'auto'|number, length: short|medium|long, ending: auto|rim-break|gold|flood } */
 export function applyControls(cfg, ctl = {}) {
   const w = cfg.machine;
   if (!w) return cfg;
@@ -47,11 +62,17 @@ export function applyControls(cfg, ctl = {}) {
   else { delete w.gravityMode; if (!w.gravity) w.gravity = 650; }
   // the count the finale starts at
   const L = LENGTHS[c.length] || LENGTHS.short;
-  if (L.ball !== 1 && !FIXED_BALL[family]) { w.ballR = Math.round(w.ballR * L.ball * 10) / 10; w.maxBalls = Math.floor(w.maxBalls / (L.ball * L.ball) / 50) * 50; cfg.render.ballR = w.ballR; }
+  const want = wantedBalls(c.balls);
+  if (want && !FIXED_BALL[family]) {   // resize the ball so the arena is full at the count you asked for
+    const r = clampR(w.ballR * Math.sqrt(w.maxBalls / want)), k = r / w.ballR;
+    w.maxBalls = Math.floor(w.maxBalls / (k * k)); w.ballR = r; cfg.render.ballR = r;
+    if (r < 10) w.splitInto = Math.max(w.splitInto || 3, splitIntoFor(r));
+  } else if (L.ball !== 1 && !FIXED_BALL[family]) { w.ballR = Math.round(w.ballR * L.ball * 10) / 10; w.maxBalls = Math.floor(w.maxBalls / (L.ball * L.ball) / 50) * 50; cfg.render.ballR = w.ballR; }
   const full = w.maxBalls;
-  if (c.target !== 'max' && Number(c.target) > 0) w.maxBalls = Math.min(full, Math.floor(Number(c.target)));
+  if (want) w.maxBalls = Math.min(full, want);   // an invented machine was already built for this count's ball size
+  else if (c.target !== 'max' && Number(c.target) > 0) w.maxBalls = Math.min(full, Math.floor(Number(c.target)));
   // length: slower machines for longer videos, and for smaller targets (they fill sooner)
-  const slow = L.slow * (L.ball !== 1 && !FIXED_BALL[family] ? (FAST_GROWTH[family] || 1) * (c.length === 'long' ? 1.25 : 1) : 1) * Math.pow(full / w.maxBalls, 0.3);
+  const slow = L.slow * (L.ball !== 1 && !want && !FIXED_BALL[family] ? (FAST_GROWTH[family] || 1) * (c.length === 'long' ? 1.25 : 1) : 1) * Math.pow(full / w.maxBalls, 0.3);
   scaleTime(w.parts, slow);
   // ending
   if (c.ending !== 'auto' && ENDINGS[c.ending]) {
@@ -64,6 +85,6 @@ export function applyControls(cfg, ctl = {}) {
   w.checkSolid = true;
   cfg.checks = { ...(cfg.checks || {}), climaxFillMin: cfg.checks && cfg.checks.climaxFillMin ? cfg.checks.climaxFillMin : 0.5, solidMax: family === 'orbit-crusher' ? 0.06 : 0.035 };
   Object.assign(cfg.render, { maxBalls: w.maxBalls, ending: w.ending, finaleHold: w.finaleHold, parts: w.parts });
-  cfg.controls = { gravity: gmode, target: c.target, length: c.length, ending: w.ending.type };
+  cfg.controls = { gravity: gmode, target: c.target, ...(want ? { balls: want } : {}), length: c.length, ending: w.ending.type };
   return cfg;
 }

@@ -17,6 +17,7 @@ import { machineModule, ARENA } from './phase2.js';
 import { partPose, partGeometry } from '../engine/machines.js';
 import { calibrate, FAMILIES as V1 } from './inventor.js';
 import { signature, closest, SIMILAR } from './novelty.js';
+import { splitIntoFor, radiusForBalls } from './controls.js';
 
 const TAU = 6.283185307179586;
 const VERSIONS = { engine: 4, renderer: 3, audio: 3, frame: 1, rule: 2, inventor: 2 };
@@ -189,11 +190,13 @@ function orbit(R, ballR, beat) {
 
 export const FAMILIES = { wave, kaleido, pendulum, geneva, orbit, sweeper: V1.sweeper, press: V1.press, blades: V1.blades };
 export const FAMILY_NAMES = Object.keys(FAMILIES);
+/** Open share of the arena each family leaves (its freeFraction): the ball size for a chosen count follows it. */
+export const FREE = { wave: 0.8, kaleido: 0.82, pendulum: 0.85, geneva: 0.82, orbit: 0.8, sweeper: 0.85, press: 0.72, blades: 0.85 };
 
 /** Invent one machine: { parts…, name, family, bpm, ballR, sig }. Pure and deterministic. */
-export function invent2(seed, family, attempt) {
+export function invent2(seed, family, attempt, balls) {
   const R = rng(seed, 0x2b7e + attempt * 0x101);
-  const bpm = Math.round(R.range(84, 124)), beat = 60 / bpm, ballR = Math.round(R.range(9, 11) * 2) / 2;
+  const bpm = Math.round(R.range(84, 124)), beat = 60 / bpm, drawn = Math.round(R.range(9, 11) * 2) / 2, ballR = balls ? radiusForBalls(balls + 50, FREE[family]) : drawn;   // a ball count you chose sets the size (+50: the count is rounded down to 50s)
   const m = FAMILIES[family](R, ballR, beat);
   if (m.hook != null) { m.start = hookStart(m.parts, m.hook, ballR).start; delete m.hook; }
   if (!['press', 'blades', 'pendulum'].includes(family) && R() < 0.18) {   // a see-through laser crossing the machine
@@ -204,9 +207,9 @@ export function invent2(seed, family, attempt) {
   return { ...m, bpm, ballR, family, sig: signature(m.parts) };
 }
 
-function build(seed, inv, attempt) {
+function build(seed, inv, attempt, sized) {
   const machine = finalize(baseMachine(seed, 0x2b7f, { ...RULE, parts: inv.parts, hubR: inv.hubR, ballR: inv.ballR, gravityChance: 1,
-    freeFraction: inv.freeFraction, start: inv.start, splitInto: 3, beamImmune: 120 }));
+    freeFraction: inv.freeFraction, start: inv.start, splitInto: sized ? Math.max(4, splitIntoFor(inv.ballR)) : 3, beamImmune: 120 }));
   machine.beatPart = inv.beatPart; machine.bladeCount = inv.parts.length;
   if (inv.gravity === 'center') machine.gravityMode = 'center';
   const cfg = wrap('invent@2', '✦ Invent', machine, seed, { bpm: inv.bpm, beatsPerBar: 4 });
@@ -219,6 +222,7 @@ function build(seed, inv, attempt) {
 
 export const ATTEMPTS = 30;   // a redraw that looks like a kept machine is skipped before calibration, so extra attempts are cheap
 /**
+ * o.balls   build the machine for this ball count: the ball is sized for it and the gaps follow the ball.
  * o.family  the family to try first (batches spread the families), o.avoid  signatures of the machines you already
  * have: an attempt that looks like one of them (similarity ≥ SIMILAR) is skipped. After 6 attempts in the preferred
  * family the other families are tried too. Deterministic: same seed and same avoid list → same machine.
@@ -233,25 +237,28 @@ export const inventV2 = machineModule('invent@2', '✦ Invent', (seed, o) => {
   const kept = [];   // signatures of this call's earlier attempts (a redraw must differ from them too)
   for (let k = 0; k < ATTEMPTS; k++) {
     const family = k < 6 ? first : others[(k - 6) % others.length];
-    const inv = invent2(seed, family, k);
+    const inv = invent2(seed, family, k, o.balls);
     const near = closest(inv.sig, avoid);
     if (near.sim >= SIMILAR) continue;
     if (closest(inv.sig, kept).sim >= SIMILAR) continue;
     kept.push(inv.sig);
-    const cfg = build(seed, inv, k);
+    const cfg = build(seed, inv, k, !!o.balls);
     cfg.invented.nearest = +near.sim.toFixed(3);
     if (!fallback) fallback = cfg;
     if (o.precheck === false) { cfg.invented.precheck = 'skipped'; return cfg; }
-    const c = calibrate(cfg);
+    // a count you chose should be reached: the estimate (made at 24 s) runs late (measured: 8 of 10 machines at 500
+    // balls ran out of time at 40–90 %), so aim the finale at 27 s instead of 33 s
+    const c = o.balls ? calibrate(cfg, 27) : calibrate(cfg);
     cfg.render.parts = cfg.machine.parts;
     if (c.ok) { cfg.invented.precheck = `speed ×${(1 / c.k).toFixed(2)} · finale ≈ ${c.est.toFixed(0)} s`; cfg.invented.speed = +(1 / c.k).toFixed(3); return cfg; }
   }
   if (fallback) { fallback.invented.precheck = 'no variant passed; kept the first new one'; return fallback; }
-  const cfg = build(seed, invent2(seed, first, 0), 0);
+  const cfg = build(seed, invent2(seed, first, 0, o.balls), 0, !!o.balls);
   cfg.invented.precheck = 'no new machine found for this seed';
   cfg.invented.repeat = true;
   return cfg;
 }, { gravity: 'auto' });
 inventV2.random = false;
 inventV2.heavyGenerate = true;
+inventV2.ballSized = true;   // generate(seed, { balls }) builds the machine for a ball count
 inventV2.families = FAMILY_NAMES;

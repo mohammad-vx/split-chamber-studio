@@ -1,7 +1,7 @@
 // Automatic quality checks (ARCHITECTURE §7.1). Pure functions → unit-testable. Each returns a list of
 // human-readable rejection reasons (empty = pass).
 import { FPS } from '../core/constants.js';
-import { similarity, SIMILAR } from '../scenarios/novelty.js';
+import { similarity, similarFor } from '../scenarios/novelty.js';
 
 export const LIMITS = {
   hookMaxS: 3.0,                 // first split must happen within 3 s (presses/blades move from frame 0)
@@ -104,6 +104,7 @@ export function explainNovelty(config, accepted) {
   if (!fp || config.invented.variationOf) return null;   // a new rhythm for a machine you kept is not a new invention
   if (config.invented.sig) {   // invent@2: compare what the machines look like, not their names
     let best = null;
+    const SIMILAR = similarFor(config.scenario);   // the freely composed inventor (invent@3) has its own threshold
     for (const a of accepted) {
       if (!a.invented || !a.invented.sig) continue;
       const v = similarity(config.invented.sig, a.invented.sig);

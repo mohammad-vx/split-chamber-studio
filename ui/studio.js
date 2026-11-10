@@ -2,6 +2,7 @@
 // new variation, other-language masters. Keyboard: ←/→ select · Enter play · A accept · R reject · Esc close.
 import { listedScenarios, registerSaved } from '../scenarios/index.js';
 import { baseFrom, slug } from '../scenarios/saved.js';
+import { wantedBalls } from '../scenarios/controls.js';
 import { Pipeline } from '../pipeline/pipeline.js';
 
 const $ = (id) => document.getElementById(id);
@@ -125,7 +126,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     el.innerHTML = `${thumb}<div class="meta">${it.invented ? '<span class="badge-invented">✦ Invented</span>' : ''}<strong>${it.label || it.scenario}</strong>
       <span>seed ${it.seed}${it.durationS ? ` · ${it.durationS.toFixed(1)} s` : ''}${it.score != null ? ` · score ${it.score}` : ''}</span>
       ${it.capN ? `<span>finale at ${it.capN.toLocaleString('en-US')} balls · ${it.capS.toFixed(1)} s</span>` : ''}
-      ${it.controls ? `<span class="cap">gravity ${it.controls.gravity} · ${it.controls.length} · ${it.controls.ending}</span>` : ''}
+      ${it.controls ? `<span class="cap">gravity ${it.controls.gravity} · ${it.controls.length} · ${it.controls.ending}${it.controls.balls ? ` · ${it.controls.balls.toLocaleString('en-US')} balls` : ''}</span>` : ''}
       ${it.caption ? `<span class="cap">${it.caption.lang.toUpperCase()}: <bdi dir="auto">${it.caption.text}</bdi></span>` : ''}
       ${reasons ? `<ul class="why">${reasons}</ul>` : ''}${it.lastError ? `<ul class="why"><li>${it.lastError.split('\n')[0]}</li></ul>` : ''}</div>`;
     el.onclick = () => { state.sel = i; state.sheet = true; render(); };   // phones: tapping a card opens its action sheet
@@ -347,7 +348,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     state.tab = 'review';
     await run(`Generating ${count} video${count > 1 ? 's' : ''}`, async () => {
       const autoAcceptScore = $('st-auto').checked ? Number($('st-auto-score').value) : null;
-      const controls = { gravity: $('st-gravity').value, target: $('st-target').value === 'max' ? 'max' : Number($('st-target').value), length: $('st-length').value, ending: $('st-ending').value };
+      const controls = { gravity: $('st-gravity').value, target: $('st-target').value === 'max' ? 'max' : Number($('st-target').value), balls: wantedBalls($('st-balls').value) || 'auto', length: $('st-length').value, ending: $('st-ending').value };
       const seeds = window.__splitChamber && window.__splitChamber.testSeeds;   // e2e tests pin seeds so results are reproducible
       const res = await state.pipeline.runBatch({ count, pattern, captions, autoAcceptScore, controls, owner: 'ui', ...(seeds ? { seeds } : {}) });
       const ok = res.filter((r) => r.status === 'candidate').length, accd = res.filter((r) => r.status === 'accepted').length;
@@ -373,9 +374,9 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     const sel = $('st-pattern'), keep = sel.value;
     sel.innerHTML = '<option value="random">Random pattern</option>' + opts(listedScenarios());
     if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
-    else if (!keep && [...sel.options].some((o) => o.value === 'invent@2')) sel.value = 'invent@2';   // new machines by default
+    else if (!keep && [...sel.options].some((o) => o.value === 'invent@3')) sel.value = 'invent@3';   // new machines by default
     $('st-filter-pattern').innerHTML = '<option value="">All patterns</option>' + opts(listedScenarios())
-      + '<option value="invent@1">✦ Invent (v1)</option>';   // older inventions stay findable
+      + '<option value="invent@2">✦ Invent (v2)</option><option value="invent@1">✦ Invent (v1)</option>';   // older inventions stay findable
   }
 
   async function init() {
@@ -398,6 +399,7 @@ export function createStudio({ onLivePlay, onWatch, onPlayConfig, toast }) {
     $('st-howto-close').onclick = () => $('st-howto').close();
     $('st-player-close').onclick = () => { $('st-video').pause(); $('st-player').close(); };
     document.querySelectorAll('#st-counts button').forEach((b) => { b.onclick = () => { $('st-count').value = b.dataset.n; }; });
+    document.querySelectorAll('#st-ballsets button').forEach((b) => { b.onclick = () => { $('st-balls').value = b.dataset.n; }; });
     window.addEventListener('keydown', keys);
     window.addEventListener('beforeunload', (e) => { if (state.busy && window.host.web) { e.preventDefault(); e.returnValue = ''; } });
     await offerResume();
