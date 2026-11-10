@@ -112,6 +112,9 @@
       <div id="st-counts" class="row-inline"><button data-n="1">1</button><button data-n="5">5</button><button data-n="10">10</button><button data-n="20">20</button><button data-n="50">50</button></div>
       <label>Gravity <select id="st-gravity"><option value="auto">Auto (best for the machine)</option><option value="on">On</option><option value="off">Off (floating)</option><option value="center">Toward the centre</option></select></label>
       <label>Stop at <select id="st-target"><option value="max">Full arena</option><option value="300">300 balls</option><option value="500">500 balls</option><option value="1000">1,000 balls</option><option value="1500">1,500 balls</option></select></label>
+      <!-- Balls (3.6): built and tested, switched off for now (owner, 2026-11-10: the balls get too small). Remove the two "hidden" classes to bring it back. -->
+      <label id="st-balls-label" class="hidden" title="How many balls fill the arena. The ball is sized for the count: more balls are smaller. Empty = the pattern's own count.">Balls <input id="st-balls" type="number" min="100" max="20000" step="100" placeholder="Auto"></label>
+      <div id="st-ballsets" class="row-inline hidden"><button data-n="">Auto</button><button data-n="500">500</button><button data-n="1000">1k</button><button data-n="3000">3k</button><button data-n="10000">10k</button></div>
       <label>Length <select id="st-length"><option value="short">Short · 30–50 s</option><option value="medium">Medium · 45–65 s</option><option value="long">Long · 60–95 s</option></select></label>
       <label>Ending <select id="st-ending"><option value="auto">Auto</option><option value="rim-break">Rim breaks</option><option value="gold">Gold wave</option><option value="flood">Flood the screen</option></select></label>
       <label>Text <select id="st-captions"><option value="none">No text</option><option value="en">English</option><option value="ar">العربية</option></select></label>

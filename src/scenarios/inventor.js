@@ -148,21 +148,22 @@ function scaleRhythm(cfg, k) {
 /**
  * Speed calibration (3.2): measure how fast the machine grows and scale its rhythm (0.6–1.6×) so the finale lands
  * near 33 s — the inventor used to pick the speed at random and the checks then rejected machines that were fine
- * but too slow or too fast. Two rounds; returns { ok, k, est } and mutates cfg.
+ * but too slow or too fast. Two rounds; returns { ok, k, est } and mutates cfg. `target`: aim the finale at another
+ * second (machines built for many small balls aim earlier: their growth slows more near the end).
  */
-export function calibrate(cfg) {
+export function calibrate(cfg, target = TARGET_S) {
   let k = 1, est = Infinity;
   for (let round = 0; round < 2; round++) {
     const g = growth(cfg);
     if (g.n12 < 4) return { ok: false, k, est: Infinity, why: 'stalls' };
     est = finaleEstimate(g);
-    if (est >= 28 && est <= 38) return { ok: true, k, est };
-    const step = Math.min(K_MAX / k, Math.max(K_MIN / k, TARGET_S / Math.min(est, 120)));
+    if (est >= target - 5 && est <= target + 5) return { ok: true, k, est };
+    const step = Math.min(K_MAX / k, Math.max(K_MIN / k, target / Math.min(est, 120)));
     if (Math.abs(step - 1) < 0.02) break;
     scaleRhythm(cfg, step); k *= step;
   }
   const g = growth(cfg); est = finaleEstimate(g);
-  return { ok: est >= 27 && est <= 39, k, est };
+  return { ok: est >= target - 6 && est <= target + 6, k, est };
 }
 
 function build(seed, o, attempt) {

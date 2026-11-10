@@ -2,7 +2,7 @@
 // check → candidate; Accept → verified master. The main process owns all disk writes (library IPC).
 import { FPS } from '../core/constants.js';
 import { getScenario, randomScenarios } from '../scenarios/index.js';
-import { applyControls } from '../scenarios/controls.js';
+import { applyControls, wantedBalls } from '../scenarios/controls.js';
 import { deriveMachine } from '../scenarios/saved.js';
 import { snapshotJpeg } from './snapshot.js';
 import { metaFromSummary } from '../sim/run.js';
@@ -13,7 +13,7 @@ import { rand } from '../engine/rng.js';
 import { signature } from '../scenarios/novelty.js';
 import { explainRun, explainAudio, explainVideo, explainDuplicate, explainNovelty, checkQuality, checkAudio, curveDescriptor, findDuplicate, score, scoreParts } from './checks.js';
 
-export const APP_VERSION = '3.5.0';   // keep equal to package.json (unit test)
+export const APP_VERSION = '3.7.0';   // keep equal to package.json (unit test)
 export const PREVIEW = { scale: 0.5, bitrateMbps: 4 };
 export const MASTER = { scale: 1, bitrateMbps: 50 };
 const TRUTH_FRAMES = (n) => [Math.floor(n * 0.08), Math.floor(n * 0.3), Math.floor(n * 0.5), Math.floor(n * 0.65), Math.floor(n * 0.8), n - 2];
@@ -128,7 +128,7 @@ export class Pipeline {
    * Inventor batches. invent@1: rotate its three families, skip structures already accepted (by name).
    * invent@2: every machine you kept or still have to review (accepted, candidates, this batch so far) is passed as a
    * signature, so the inventor never draws one of them again (turned, mirrored or shifted); the family is the one you
-   * have least of.
+   * have least of. invent@3 works the same way with its layouts (hub, ring, rim, twin, classic) and its own threshold.
    */
   async inventOpts(i, key = 'invent@1') {
     const all = await S().list();
@@ -153,6 +153,8 @@ export class Pipeline {
 
   async generateOne({ scenarioKey, seed, captions, batch = null, controls = null, baseConfig = null, genOpts = null }) {
     const sc = getScenario(scenarioKey);
+    const want = wantedBalls(controls && controls.balls);
+    if (want && sc.ballSized && !baseConfig) genOpts = { ...(genOpts || {}), balls: want };   // the machine is built for the ball size
     const base = baseConfig || (sc.heavyGenerate && typeof Worker !== 'undefined' ? await generateInWorker(scenarioKey, seed, genOpts || {}) : sc.generate(seed, genOpts || {}));
     const config = applyControls(base, controls || {});
     const id = await S().id(config);

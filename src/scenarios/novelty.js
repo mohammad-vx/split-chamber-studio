@@ -13,6 +13,12 @@ import { ARENA } from './phase2.js';
 export const RINGS = 10, SECTORS = 36;
 const SAMPLES = 60, SPAN_S = 24, SNAPS = 8, HARM = 9;
 export const SIMILAR = 0.66;   // at or above: the same machine (tuned on sampled inventions, see tools/novelty-tune.mjs)
+// invent@3 puts machines together freely, and most of them sweep the whole disc, so their coverage looks alike: at
+// 0.66 twin hubs with hammers counted as the same machine as eight rim arms with blocks (0.72). Measured on 335
+// inventions: 0.78–0.84 are the same layout with another tool or another drive, 0.90 and above the same look.
+export const SIMILAR_FREE = 0.84;
+/** The threshold for a machine made by this pattern. */
+export const similarFor = (scenario) => (scenario === 'invent@3' ? SIMILAR_FREE : SIMILAR);
 
 // 3 × 3 sample points per cell (one point per cell missed small parts); equal-area rings
 function cells() {
@@ -75,7 +81,7 @@ export function similarity(a, b) {
 const LOOK_LEN = RINGS * HARM;
 // parsed signatures, so comparing one invention with hundreds of kept machines does not re-parse them every time
 const CACHE = new Map();
-function memo(key, make) { let v = CACHE.get(key); if (!v) { if (CACHE.size > 4000) CACHE.clear(); v = make(); CACHE.set(key, v); } return v; }
+function memo(key, make) { let v = CACHE.get(key); if (!v) { if (CACHE.size > 40000) CACHE.clear(); v = make(); CACHE.set(key, v); } return v; }
 function moments(str) { const out = []; for (let k = 0; k < SNAPS; k++) { const m = []; for (let q = 0; q < LOOK_LEN; q++) m.push(Number(str.substr((k * LOOK_LEN + q) * 2, 2))); out.push(m); } return out; }
 function jac(x, y) { let lo = 0, hi = 0; for (let q = 0; q < x.length; q++) { lo += Math.min(x[q], y[q]); hi += Math.max(x[q], y[q]); } return hi ? lo / hi : 1; }
 function look(a, b) {
@@ -111,9 +117,21 @@ function half(a, b) {
   return best;
 }
 
-/** The closest signature in a list: { sim, index } (sim 0 when the list is empty). */
-export function closest(sig, list) {
+/**
+ * The closest signature in a list: { sim, index } (sim 0 when the list is empty). With `floor`, pairs that cannot
+ * reach it are skipped without the costly half of the comparison (the look alone bounds the result: (look + 1) / 2),
+ * so `sim` is exact whenever it is at or above the floor; below it, it may be an underestimate. Hundreds of kept
+ * machines are then compared in milliseconds instead of seconds.
+ */
+export function closest(sig, list, floor = 0) {
   let sim = 0, index = -1;
-  (list || []).forEach((s, i) => { const v = similarity(sig, s); if (v > sim) { sim = v; index = i; } });
+  const n = RINGS * SECTORS, ok = sig && sig.startsWith('v2:');
+  (list || []).forEach((s, i) => {
+    if (!ok || !s || s.length !== sig.length) return;
+    const l = look(sig.slice(3 + n), s.slice(3 + n));
+    if ((l + 1) / 2 < Math.max(floor, sim)) return;
+    const v = (half(sig.slice(3, 3 + n), s.slice(3, 3 + n)) + l) / 2;
+    if (v > sim) { sim = v; index = i; }
+  });
   return { sim, index };
 }

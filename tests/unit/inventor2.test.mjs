@@ -9,9 +9,9 @@ import { explainNovelty } from '../../src/pipeline/checks.js';
 const turned = (parts, a) => parts.map((p) => (p.parent == null && p.type === 'circle' ? { ...p, angle: (p.angle || 0) + a } : p));
 const mirrored = (parts) => parts.map((p) => (p.parent == null && p.type === 'circle' ? { ...p, angle: -(p.angle || 0) } : p));
 
-test('invent@2 is offered (not at random), has eight families and reproduces', () => {
+test('invent@2 still replays (invent@3 replaced it in the list), has eight families and reproduces', () => {
   const sc = getScenario('invent@2');
-  assert.ok(listedScenarios().includes(sc) && !randomScenarios().includes(sc));
+  assert.ok(!listedScenarios().includes(sc) && !randomScenarios().includes(sc));
   assert.equal(FAMILY_NAMES.length, 8);
   for (const fam of FAMILY_NAMES) {
     const a = sc.generate(3, { family: fam, precheck: false });

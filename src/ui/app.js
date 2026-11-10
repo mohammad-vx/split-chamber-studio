@@ -369,7 +369,8 @@ let studio = null;
 /** Headless batch: electron . --generate=N [--pattern=key|random] [--captions=en|ar|none] [--seeds=1,2] [--accept-all] */
 async function runCli(cli, debug) {
   const pipeline = new Pipeline({ debug, onEvent: (ev) => { if (ev.type !== 'stage') host.log('cli', JSON.stringify(ev.type === 'item' ? { id: ev.status.id, status: ev.status.status, reasons: ev.status.reasons } : ev)); } });
-  const results = await pipeline.runBatch({ count: cli.generate, pattern: cli.pattern, captions: cli.captions, seeds: cli.seeds, acceptAll: cli.accept, owner: 'cli' });
+  const results = await pipeline.runBatch({ count: cli.generate, pattern: cli.pattern, captions: cli.captions, seeds: cli.seeds, acceptAll: cli.accept, owner: 'cli',
+    ...(cli.balls || cli.length ? { controls: { ...(cli.balls ? { balls: cli.balls } : {}), ...(cli.length ? { length: cli.length } : {}) } } : {}) });
   const brief = results.map((r) => ({ id: r.id, status: r.status, scenario: r.scenario, seed: r.seed, reasons: r.reasons, error: r.error, durationS: r.durationS }));
   await host.studio.cliDone({ ok: results.length > 0 && results.every((r) => r.status !== 'failed'), results: brief });
 }

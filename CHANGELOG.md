@@ -4,6 +4,36 @@ Each release has its own number (`major.minor.patch`): **minor** for new feature
 for fixes. The number appears in the window title, next to the Studio name, in the installer file names
 (`SplitChamberStudio-<version>-setup.exe`) and in every video's `status.json` (`appVersion`).
 
+## 3.7.0 — 2026-11-10 · Inventor v3: machines put together freely
+- ✦ Invent is now invent@3. Instead of eight drawings whose numbers change, a machine is put together from
+  independent choices: a layout (limbs on the hub, tools or small rotors on a ring around it, arms hinged on the rim
+  striking a central anvil, two hubs side by side) × how many limbs × how each is driven (spinning, swinging,
+  slamming, stepping, pumping) × an optional elbow × a tool × whether the tool spins × how the copies are phased ×
+  optional rim teeth and a laser. invent@2's eight families remain as the "classic" layout.
+- New shapes: star, gear, cross, anchor, scoop, hook, comb, fork, hammer, wedge, fan, block, stone, ball. The curved
+  and toothed ones are several convex parts on one parent, so the engine is unchanged.
+- Nothing is tuned by hand: the limb lengths are fitted so the machine passes the rim (or the anvil) one ball apart,
+  the open space is measured, and the first ball is put where a part strikes first.
+- The arena fills: the finale is aimed at 27 s instead of 33 s. Measured on 24 machines: 22 pass the checks and 22
+  reach the full count (invent@2: 9 of 10 passed but only 1 of 10 reached the full count before time ran out).
+- Novelty: invent@3 uses its own threshold (84 % instead of 66 %): most free machines sweep the whole disc, and at
+  66 % twin hubs with hammers counted as the same machine as eight rim arms with blocks. Between 78 % and 84 % are
+  siblings (the same layout with another tool or drive), which now count as different machines.
+- The similarity search skips pairs that cannot match, so thousands of kept machines compare quickly.
+- invent@2 and invent@1 still replay and stay in the filter; they are no longer offered in Generate.
+- `node tools/invent3-tune.mjs [seeds] [1 = calibrate]` counts the different machines.
+
+## 3.6.0 — 2026-11-10 · A ball count you choose (built, switched off in the panel)
+- New setting `balls` (100–20,000): the arena is full at that count, because the ball is sized for it (10,000 balls
+  ≈ 3 px radius). ✦ Invent builds the machine for the ball size, small balls split into more pieces (up to 8), and a
+  chosen count aims its finale at 27 s. Measured: 500 balls 10/10 reached the count, 3,000 balls 7/10.
+- **Not shown in Generate**: the owner found the balls too small, so the "Balls" field is hidden and "Stop at" stays.
+  The setting still works from the command line (`--balls=3000`, `--length=long`); to bring the field back, remove the
+  two `hidden` classes next to `st-balls` in `src/index.html`.
+- Patterns tuned to one ball size (Melodic Rams, Crocodile Jaws, Fist Arm, Hammer & Bowl) keep their ball: for them
+  the count only stops the video earlier. Without a count nothing changes; old videos reproduce as before.
+- `node tools/balls-probe.mjs <pattern> <balls>` measures a count with the real checks.
+
 ## 3.5.0 — 2026-11-07 · Inventor v2: never the same machine twice
 - ✦ Invent is now invent@2: five new machine families on mechanisms the engine already had: wave (a ring of pistons
   hammering the rim one after another), kaleidoscope (a random convex shape repeated 3–6 times, spinning, stepping or

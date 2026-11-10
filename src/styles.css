@@ -88,6 +88,7 @@ input[type=text], select { font: inherit; color: var(--text); background: rgba(0
 .st-gen label { display: flex; gap: 8px; align-items: center; color: var(--muted); }
 .st-gen input[type=number] { width: 70px; font: inherit; color: var(--text); background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .st-gen select { width: auto; }
+.st-gen #st-balls { width: 92px; }
 .row-inline { display: flex; gap: 6px; }
 .row-inline button { padding: 6px 10px; }
 .st-job { justify-content: space-between; }

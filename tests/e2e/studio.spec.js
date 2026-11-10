@@ -140,7 +140,7 @@ test('UI: an invented machine gets its badge and can be saved as a pattern', asy
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.waitForSelector('#studio:not(.hidden)');
   await page.click('#st-generate');
-  await page.selectOption('#st-pattern', 'invent@2');
+  await page.selectOption('#st-pattern', 'invent@3');
   await page.fill('#st-count', '1');
   await page.evaluate(() => { window.__splitChamber.testSeeds = [6]; });
   await page.click('#st-start');
@@ -159,6 +159,36 @@ test('UI: an invented machine gets its badge and can be saved as a pattern', asy
     const saved = JSON.parse(fs.readFileSync(path.join(lib, 'patterns.json'), 'utf8'));
     expect(saved.map((p) => p.key)).toContain('mine-test-arm@1');
   }
+  expect(errors).toEqual([]);
+  await app.close();
+});
+
+test('UI: the Balls field makes the arena full at the count asked', async () => {
+  const lib = tmp('balls');
+  const app = await electron.launch({ args: [ROOT, '--mute', `--library=${lib}`, `--out-dir=${path.join(lib, 'out')}`], cwd: ROOT });
+  const page = await app.firstWindow();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.waitForSelector('#studio:not(.hidden)');
+  await page.click('#st-generate');
+  // the count is built into invent@2 only, which is no longer in the list
+  await page.evaluate(() => { document.getElementById('st-pattern').add(new Option('✦ Invent (v2)', 'invent@2')); });
+  await page.selectOption('#st-pattern', 'invent@2');
+  await page.fill('#st-count', '1');
+  // the field is switched off in the panel for now: show it the way turning it back on would
+  await page.evaluate(() => { for (const id of ['st-balls-label', 'st-ballsets']) document.getElementById(id).classList.remove('hidden'); });
+  await page.click('#st-ballsets button[data-n="3000"]');
+  await expect(page.locator('#st-balls')).toHaveValue('3000');
+  await page.evaluate(() => { window.__splitChamber.testSeeds = [6]; });
+  await page.click('#st-start');
+  await expect(page.locator('#st-job')).toBeHidden({ timeout: 12 * 60 * 1000 });
+  const st = statuses(lib)[0];
+  expect(st.controls.balls).toBe(3000);
+  const cfg = JSON.parse(fs.readFileSync(path.join(lib, 'videos', st.id, 'config.json'), 'utf8'));
+  expect(cfg.machine.maxBalls).toBe(3000);
+  expect(cfg.machine.ballR).toBeLessThan(7);
+  if (st.capN) expect(st.capN).toBeLessThanOrEqual(3000);   // the finale starts at the count, or earlier if time runs out
   expect(errors).toEqual([]);
   await app.close();
 });
