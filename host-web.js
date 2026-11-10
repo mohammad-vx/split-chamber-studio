@@ -293,7 +293,7 @@ window.host = {
   web: true,
   libUrl: (id, file) => `lib/${vpath(id, file)}`,
   download: (id, file) => download(vpath(id, file), `SplitChamber_${id}_${file}`),
-  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.4.0', gate: null, bench: null }),
+  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.5.0', gate: null, bench: null }),
   ffmpegEncoders: async () => ({}),
   async saveSession(buffer, meta) {
     const name = `SplitChamber_${stamp()}_seed${meta.seed}.scsession`, data = await gz(buffer, 'c');

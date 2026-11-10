@@ -87,7 +87,7 @@ function blades(R, ballR, beat) {
     name: `twin sector blades · ${Math.round(w * 57)}° wide · ${MECH_NAMES[kind]}`, freeFraction: 0.85 };
 }
 
-const FAMILIES = { sweeper, press, blades };
+export const FAMILIES = { sweeper, press, blades };
 
 /** Invent a machine from a seed: { machine parts…, name, family }. Pure and deterministic. */
 export function invent(seed, o = {}) {

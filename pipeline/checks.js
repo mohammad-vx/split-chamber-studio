@@ -1,6 +1,7 @@
 // Automatic quality checks (ARCHITECTURE §7.1). Pure functions → unit-testable. Each returns a list of
 // human-readable rejection reasons (empty = pass).
 import { FPS } from '../core/constants.js';
+import { similarity, SIMILAR } from '../scenarios/novelty.js';
 
 export const LIMITS = {
   hookMaxS: 3.0,                 // first split must happen within 3 s (presses/blades move from frame 0)
@@ -100,7 +101,19 @@ export function hamming(a, b) {
 export function machineFingerprint(config) { return config && config.invented ? `${config.invented.family}: ${config.invented.name}` : null; }
 export function explainNovelty(config, accepted) {
   const fp = machineFingerprint(config);
-  if (!fp) return null;
+  if (!fp || config.invented.variationOf) return null;   // a new rhythm for a machine you kept is not a new invention
+  if (config.invented.sig) {   // invent@2: compare what the machines look like, not their names
+    let best = null;
+    for (const a of accepted) {
+      if (!a.invented || !a.invented.sig) continue;
+      const v = similarity(config.invented.sig, a.invented.sig);
+      if (!best || v > best.v) best = { v, id: a.id };
+    }
+    const ok = !best || best.v < SIMILAR;
+    return row('preview', 'A machine you do not have yet', best ? `${Math.round(best.v * 100)} % like ${best.id}` : 'nothing similar',
+      `under ${Math.round(SIMILAR * 100)} % like any machine you kept or have to review (turned, mirrored or shifted counts as the same)`, ok,
+      ok ? '' : `same machine as video ${best.id} (${Math.round(best.v * 100)} % alike)`);
+  }
   const same = accepted.find((a) => a.invented && `${a.invented.family}: ${a.invented.name}` === fp);
   return row('preview', 'A machine you have not accepted yet', fp, 'no accepted invention with the same structure', !same, same ? `same machine as accepted video ${same.id}` : '');
 }
