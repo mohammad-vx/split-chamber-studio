@@ -90,17 +90,34 @@ const ready = (async () => {
 const R = (fn) => async (...a) => { await ready; return fn(...a); };
 
 // ------------------------------------------------------------------ media helpers (seek a <video>, draw, measure)
+// Phones (3.7.1): a <video> that is not in the page and has never played loads no frame there, so `loadeddata` and
+// `seeked` never came and "Checking audio & picture" waited for ever. The element now sits in the page (2 px, off
+// screen), is started once muted, and every wait has a time limit: a browser that will not step through the video
+// ends the check with what it measured instead of hanging the batch.
+const within = (promise, ms) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve('timeout'), ms))]);
 async function openVideo(key) {
   const url = URL.createObjectURL(await readBlob(key));
   const v = document.createElement('video');
-  v.muted = true; v.preload = 'auto'; v.playsInline = true; v.src = url;
-  await new Promise((resolve, reject) => { v.onloadeddata = resolve; v.onerror = () => reject(new Error(`The browser could not decode ${key}`)); });
-  return { v, close: () => { v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); } };
+  v.muted = true; v.defaultMuted = true; v.preload = 'auto'; v.playsInline = true;
+  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+  v.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+  document.body.appendChild(v);
+  const close = () => { try { v.pause(); } catch { /* not started */ } v.removeAttribute('src'); v.load(); v.remove(); URL.revokeObjectURL(url); };
+  const meta = new Promise((resolve, reject) => { v.onloadedmetadata = () => resolve('ok'); v.onerror = () => reject(new Error(`The browser could not decode ${key}`)); });
+  v.src = url;
+  try {
+    if (await within(meta, 20000) === 'timeout') throw new Error(`The browser did not open ${key}`);
+    if (v.readyState < 2) { await within(Promise.resolve().then(() => v.play()).catch(() => {}), 4000); try { v.pause(); } catch { /* ignore */ } }
+    if (v.readyState < 2) await within(new Promise((resolve) => { v.onloadeddata = resolve; }), 8000);
+  } catch (e) { close(); throw e; }
+  return { v, close };
 }
+/** Seek and wait for the frame. Resolves false when the browser does not answer within 6 s. */
 const seek = (v, t) => new Promise((resolve) => {
   const tt = Math.max(0, Math.min(t, (v.duration || t) - 0.001));
-  if (Math.abs(v.currentTime - tt) < 1e-4 && v.readyState >= 2) return resolve();
-  v.onseeked = () => { v.onseeked = null; resolve(); }; v.currentTime = tt;
+  if (Math.abs(v.currentTime - tt) < 1e-4 && v.readyState >= 2) return resolve(true);
+  const timer = setTimeout(() => { v.onseeked = null; resolve(false); }, 6000);
+  v.onseeked = () => { v.onseeked = null; clearTimeout(timer); resolve(true); }; v.currentTime = tt;
 });
 function grayOf(src, w, h) {
   const c = new OffscreenCanvas(w, h), g = c.getContext('2d', { willReadFrequently: true });
@@ -150,8 +167,9 @@ const media = {
     try {
       const step = 0.25, W = 36, H = 64, freezes = [], blacks = [];
       let prev = null, fr = 0, bl = 0;
+      let stalled = false;
       for (let t = step / 2; t < v.duration; t += step) {
-        await seek(v, t);
+        if (!(await seek(v, t))) { stalled = true; break; }   // no frame came: stop here (a stale frame would read as a freeze)
         const g = grayOf(v, W, H);
         const dark = g.reduce((n, x) => n + (x < 0.1 * 255 ? 1 : 0), 0) / g.length;
         if (dark >= 0.98) bl += step; else { if (bl >= 0.5) blacks.push(bl); bl = 0; }
@@ -162,7 +180,8 @@ const media = {
         prev = g;
       }
       if (bl >= 0.5) blacks.push(bl); if (fr >= 1) freezes.push(fr);
-      return { freezes, blacks, longestFreeze: freezes.length ? Math.max(...freezes) : 0, longestBlack: blacks.length ? Math.max(...blacks) : 0 };
+      return { freezes, blacks, longestFreeze: freezes.length ? Math.max(...freezes) : 0, longestBlack: blacks.length ? Math.max(...blacks) : 0,
+        ...(stalled ? { note: 'this browser stopped stepping through the video: the picture check covers only the start' } : {}) };
     } finally { close(); }
   },
 
@@ -171,7 +190,7 @@ const media = {
     try {
       const out = [];
       for (let k = 0; k < count; k++) {
-        await seek(v, (durationS * (k + 0.5)) / count);
+        if (!(await seek(v, (durationS * (k + 0.5)) / count))) { while (out.length < count) out.push('0'.repeat(16)); break; }
         const px = grayOf(v, 9, 8); let bits = '';
         for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += px[y * 9 + x] < px[y * 9 + x + 1] ? '1' : '0';
         out.push(BigInt(`0b${bits}`).toString(16).padStart(16, '0'));
@@ -293,7 +312,7 @@ window.host = {
   web: true,
   libUrl: (id, file) => `lib/${vpath(id, file)}`,
   download: (id, file) => download(vpath(id, file), `SplitChamber_${id}_${file}`),
-  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.7.0', gate: null, bench: null }),
+  info: async () => ({ videos: 'Browser storage', sessions: 'Browser storage', cleaned: 0, root: '.', version: '3.7.1', gate: null, bench: null }),
   ffmpegEncoders: async () => ({}),
   async saveSession(buffer, meta) {
     const name = `SplitChamber_${stamp()}_seed${meta.seed}.scsession`, data = await gz(buffer, 'c');
